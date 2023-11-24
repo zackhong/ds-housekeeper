@@ -1,0 +1,50 @@
+@font-face {
+  font-family: 'Mulish';
+  src: url('./assets/Mulish-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Mulish';
+  src: url('./assets/Mulish-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+}
+
+:root {
+    --color-main-bg: white;
+    --color-text: #333;
+    --color-warn: rgb(224, 10, 10);
+    --color-link: #007bff;
+
+    --size-m: 12px;
+    --size-xl: 60px;
+
+    --font-s: 12px;
+    --font-m: 14px;
+  }
+  
+  body {
+    margin: 0px;
+    padding: 0px;
+    background-color: var(--color-main-bg);
+  }
+
+  p{
+    font-family: 'Mulish', sans-serif;
+    font-weight: normal;
+    font-size: var(--font-m);
+    color: var(--color-text);
+    /* border: 1px solid red; */
+    padding: 0px;
+    margin: 0px;
+  }
+  
+  a {
+    color: var(--color-link);
+    text-decoration: none;
+  }
+  
+  /* Your other global styles here */
+  

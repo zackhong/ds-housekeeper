@@ -1,0 +1,11 @@
+{
+  "name": "Design Style Housekeeper",
+  "id": "1308615968775252018",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "index.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["https://fonts.googleapis.com/", "https://fonts.gstatic.com", "https://rsms.me"]
+  }
+}

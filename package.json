@@ -1,0 +1,32 @@
+{
+  "name": "svelte-app",
+  "version": "1.0.4",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "start": "sirv public"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.81.0",
+    "@rollup/plugin-commonjs": "25.0.7",
+    "@rollup/plugin-image": "3.0.3",
+    "@rollup/plugin-node-resolve": "15.2.3",
+    "@rollup/plugin-terser": "0.4.4",
+    "@rollup/plugin-typescript": "11.1.5",
+    "caniuse-lite": "^1.0.30001563",
+    "cssnano": "6.0.1",
+    "rollup": "4.5.0",
+    "rollup-plugin-html-bundle": "0.0.3",
+    "rollup-plugin-livereload": "2.0.5",
+    "rollup-plugin-postcss": "^4.0.2",
+    "rollup-plugin-svelte": "7.1.6",
+    "rollup-plugin-svg": "^2.0.0",
+    "svelte": "4.2.7",
+    "tslib": "2.6.2",
+    "typescript": "5.3.2"
+  },
+  "dependencies": {
+    "sirv-cli": "2.0.2"
+  }
+}
