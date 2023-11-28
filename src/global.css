@@ -1,28 +1,25 @@
-@font-face {
-  font-family: 'Mulish';
-  src: url('./assets/Mulish-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Mulish';
-  src: url('./assets/Mulish-Bold.ttf') format('truetype');
-  font-weight: bold;
-  font-style: normal;
-}
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600&display=swap');
 
 :root {
     --color-main-bg: white;
     --color-text: #333;
+    --color-text-faint: #939393;
+    --color-divider: #ddd;
+    --color-row-stripe: #efefef;
     --color-warn: rgb(224, 10, 10);
     --color-link: #007bff;
+    --color-hover: #005cbe;
 
+    --size-xs: 4px;
+    --size-s: 8px;
     --size-m: 12px;
+    --size-ml: 20px;
+    --size-l: 48px;
     --size-xl: 60px;
 
     --font-s: 12px;
     --font-m: 14px;
+    --font-l: 16px;
   }
   
   body {
@@ -32,14 +29,26 @@
   }
 
   p{
-    font-family: 'Mulish', sans-serif;
-    font-weight: normal;
+    font-family: 'Roboto Condensed', sans-serif;
+    font-weight: 400;
     font-size: var(--font-m);
+    line-height: var(--font-m);
     color: var(--color-text);
-    /* border: 1px solid red; */
     padding: 0px;
     margin: 0px;
   }
+
+  p.small{
+    font-size: var(--font-s);
+    line-height: var(--font-s);
+  }
+
+  p.large{
+    font-size: var(--font-l);
+    line-height: var(--font-l);
+  }
+
+  p.bold{font-weight: 600;}
   
   a {
     color: var(--color-link);

@@ -10,13 +10,20 @@ let remoteComps = new Set();
 //using Promise and setTimeout to temp. pause plugin code so UI has time to update
 function delay(timeInMs:number){ return new Promise( (resolve)=> setTimeout(resolve, timeInMs) ); }
 
-function figmaColorToRGBA(color, opacity) {
-  // Convert the RGB values from 0-1 range to 0-255
-  const red = Math.round(color.r * 255);
-  const green = Math.round(color.g * 255);
-  const blue = Math.round(color.b * 255);
 
-  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+// Convert values from Figma's color object to an rgba string 
+// this converts an rgb component (ranging from 0 to 255) to its hex representation
+function componentToHex(c) {
+  const hex = c.toString(16);
+  //prepends output with '0' if it's only 1 char long
+  return hex.length === 1 ? '0' + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+  const red = componentToHex(Math.round(r * 255));
+  const green = componentToHex(Math.round(g * 255));
+  const blue = componentToHex(Math.round(b * 255));
+  return `#${red}${green}${blue}`;
 }
 
 
@@ -25,59 +32,68 @@ function figmaColorToRGBA(color, opacity) {
 //------------------FUNCTIONS FOR LOCAL STYLES
 export async function getLocalText(){
 
-  const textData = [];
-
+  //text data to be sent to UI via postMessage(); has to be serialisable object ie Array to be sent in message
+  const textToUI = [];
   figma.ui.postMessage({type:"load-update", text:`Finding local text styles...`});
   await delay(50);
 
   const localTextStyles = figma.getLocalTextStyles();
 
-  for (const localStyle of localTextStyles) {
-    const styleID = localStyle.id;
-    const styleName = localStyle.name;
-    const fontName = localStyle.fontName.family;
-    const fontWeight = localStyle.fontName.style;
-    const fontSize = localStyle.fontSize;
+  for (const style of localTextStyles) {
+    const styleID = style.id;
+    const styleName = style.name;
+    //get info like font name, font weight, font size and line height
+    const fontName = style.fontName.family;
+    const fontWeight = style.fontName.style;
+    const fontSize = style.fontSize;
     let lineHeight;
-    if (localStyle.lineHeight.unit === 'AUTO') { lineHeight = 'auto'; } 
-    else if (localStyle.lineHeight.unit === 'PIXELS') { lineHeight = localStyle.lineHeight.value + 'px'; } 
-    else if (localStyle.lineHeight.unit === 'PERCENT') {lineHeight = localStyle.lineHeight.value + '%';}
+    if (style.lineHeight.unit === 'AUTO') { lineHeight = 'auto'; }  
+    else if (style.lineHeight.unit === 'PERCENT') { lineHeight = Math.floor(style.lineHeight.value) + '%'; }
+    else if (style.lineHeight.unit === 'PIXELS') { lineHeight = style.lineHeight.value; }
+    const styleInfo = {fontName: fontName, fontWeight: fontWeight, fontSize: fontSize, lineHeight: lineHeight};
     
     localText.add(styleID);
-    textData.push( {styleID: styleID, name: styleName, fontName: fontName, fontWeight: fontWeight, fontSize: fontSize, lineHeight: lineHeight});
+    textToUI.push( {id: styleID, name: styleName, info: styleInfo });
   }
-  figma.ui.postMessage({type:"result-display", dataType: "text-blob", data: textData});
-  // console.log(textData);
+  figma.ui.postMessage({type:"display-text", data: textToUI});
+  // console.log(textToUI);
 }
+
 
 export async function getLocalColors(){
 
-  const colorData = [];
-
+  const colorsToUI = [];
   figma.ui.postMessage({type:"load-update", text:`Finding local color styles...`});
   await delay(50);
 
   const localColorStyles = figma.getLocalPaintStyles();
 
-  for (const localStyle of localColorStyles) {
-    const styleID = localStyle.id;
-    const styleName = localStyle.name;
-    const colorType = localStyle.paints[0].type;
-    let colorInfo ='';
-    // store rgba info if this is a solid paint style
-    if(colorType == 'SOLID'){colorInfo = figmaColorToRGBA(localStyle.paints[0].color, localStyle.paints[0].opacity);}
+  for (const style of localColorStyles) {
+    const styleID = style.id;
+    const styleName = style.name;
+    const colorType = style.paints[0].type;
+    let colorInfo ={};
+    // if this color style is a solid color, store its rgb value and opacity
+    if(colorType == 'SOLID'){
+      colorInfo = {
+        hex:rgbToHex(
+          style.paints[0].color.r, 
+          style.paints[0].color.g, 
+          style.paints[0].color.b), 
+        opacity: style.paints[0].opacity};
+    }
     
     localColors.add(styleID);
-    colorData.push( {styleID: styleID, name: styleName, type: colorType, info: colorInfo });
+    colorsToUI.push( {styleID: styleID, name: styleName, type: colorType, info: colorInfo });
   }
-  figma.ui.postMessage({type:"result-display", dataType: "color-blob", data: colorData});
-  // console.log(colorData);
+  figma.ui.postMessage({type:"result-display", dataType: "color", data: colorsToUI});
+  // console.log(colorsToUI);
 }
+
 
 export async function getLocalComps() {
 
-  let compData = [];
-
+  let compsToUI;
   figma.ui.postMessage({type:"load-update", text:`Finding local components...`});
   await delay(50);
   
@@ -87,7 +103,7 @@ export async function getLocalComps() {
   for(const page of pages){
     //filter out component nodes that are part of a component set to avoid double-counting
     let compNodes = page.findAllWithCriteria({ types: ["COMPONENT"]});
-    compNodes = compNodes.filter(node => node.parent?.type == "COMPONENT_SET");
+    compNodes = compNodes.filter(node => node.parent.type !== "COMPONENT_SET");
     const variantNodes = page.findAllWithCriteria({ types: ["COMPONENT_SET"]});
 
     // further split the checking process into chunks so that UI will be more responsive
@@ -96,19 +112,19 @@ export async function getLocalComps() {
     for (let i = 0; i < compNodes.length; i += chunkSize) {
       
       const chunk = compNodes.slice(i, i + chunkSize);
-      compData = [];
+      compsToUI = [];
       
       // Process the chunk
       for(const node of chunk){
         localComps.add(node.id);
-        compData.push({styleID: node.id, name: node.name});
+        compsToUI.push({styleID: node.id, name: node.name});
       }
       // display warning if we're processing a lot of nodes
       if(compNodes.length > (2 * chunkSize) ){
         figma.ui.postMessage({type:"load-warning", text:`Processing ${i}/${compNodes.length} components in ${page.name}...`});
       }
       //send comp data in chunks to ui as well
-      figma.ui.postMessage({type:"result-display", dataType: "comp-blob", data: compData});
+      figma.ui.postMessage({type:"result-display", dataType: "component", data: compsToUI});
       await delay(50);
     }
 
@@ -116,17 +132,17 @@ export async function getLocalComps() {
     for (let i = 0; i < variantNodes.length; i += chunkSize) {
 
       const chunk = variantNodes.slice(i, i + chunkSize);
-      compData = [];
+      compsToUI = [];
 
       for(const node of chunk){
         localComps.add(node.id);
-        compData.push({styleID: node.id, name: node.name});
+        compsToUI.push({styleID: node.id, name: node.name});
       }
       // display warning if we're processing a lot of nodes
       if(variantNodes.length > (2 * chunkSize) ){
         figma.ui.postMessage({type:"load-warning", text:`Processing ${i}/${variantNodes.length} variants in ${page.name}...`});
       }
-      figma.ui.postMessage({type:"result-display", dataType: "comp-blob", data: compData});
+      figma.ui.postMessage({type:"result-display", dataType: "comp-blob", data: compsToUI});
       await delay(50);
     }
   }
@@ -142,13 +158,13 @@ export async function getRemoteText(){
     figma.ui.postMessage({type:"load-update", text:`Finding library text styles...`});
     await delay(50);
 
-    let textData = [];
+    let textToUI = [];
     // split search of text nodes to page by page
     const pages = figma.root.children;
     for(const page of pages){
 
       const textNodes = page.findAllWithCriteria({ types: ["TEXT"]});
-      console.log(`${textNodes.length} text nodes in ${page.name}`);
+      // console.log(`${textNodes.length} text nodes in ${page.name}`);
 
       // further split the checking process into chunks so that UI will be more responsive
       const chunkSize = 100;
@@ -162,8 +178,19 @@ export async function getRemoteText(){
             const styleID = String(node.textStyleId);
             // process this node if we find a valid and new style id
             if(styleID && !styleID.includes('Symbol') && !localText.has(styleID)){
-              const style = figma.getStyleById(styleID);
-              //todo: collate info
+              const style = figma.getStyleById(styleID) as TextStyle;
+              const styleName = style.name;
+              //get info like font name, font weight, font size and line height
+              const fontName = style.fontName.family;
+              const fontWeight = style.fontName.style;
+              const fontSize = style.fontSize;
+              let lineHeight;
+              if (style.lineHeight.unit === 'AUTO') { lineHeight = 'auto'; } 
+              else if (style.lineHeight.unit === 'PIXELS') { lineHeight = style.lineHeight.value + 'px'; } 
+              else if (style.lineHeight.unit === 'PERCENT') {lineHeight = style.lineHeight.value + '%';}
+              
+              remoteText.add(styleID);
+              textToUI.push( {styleID: styleID, name: styleName, fontName: fontName, fontWeight: fontWeight, fontSize: fontSize, lineHeight: lineHeight});
             }
           }
 
@@ -174,12 +201,15 @@ export async function getRemoteText(){
           await delay(50);
       }
     }
+    figma.ui.postMessage({type:"result-display", dataType: "text", data: textToUI});
+    await delay(50);
 }
+
+
 
 export async function getRemoteColors(){
 
-    let colorData = [];
-
+    let colorsToUI = [];
     // since there isn't a getRemotePaintStyles() method, we have to check every node for color styles that aren't local
     figma.ui.postMessage({type:"load-update", text:`Finding library color styles...`});
     await delay(50);

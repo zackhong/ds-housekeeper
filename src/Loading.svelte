@@ -37,6 +37,7 @@
 
             case "load-end":
             UpdateText("Loading done!");
+            Hide();
             break;
         }
     }
@@ -51,6 +52,7 @@
 
 
 <style>
+
     .cont{
         background-color: var(--color-main-bg);
         /* position: fixed; */
@@ -76,7 +78,6 @@
         color: var(--color-warn);
         text-align: center;
         opacity: 0;/* Initial state hidden */
-        /* border: 1px solid red; */
     }
     .warning.visible{
         opacity: 1; /* Visible state */
