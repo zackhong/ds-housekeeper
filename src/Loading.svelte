@@ -3,41 +3,45 @@
 <script>
     //loading screen for ui; gets called on page load, and whenever you're performing the expensive track usage actions
     let loading;//ref to loading container divs
-    let warning;
 
     let mainText="Loading...";
-    let warnVisible = false;
     let warnSuffix="this could take some time!";
-    let warnText="Warning!";
+    let warnText="Warning: might be slow for large files!";
 
-    function UpdateText(newText){
+    function updateText(newText){
         mainText = newText;
-        //hide warning if it was previously on display
-        if(warnVisible){warnVisible = false;}
     }
 
-    function UpdateWarning(newText){
-        //make warning visible if it was previously hidden
-        if(!warnVisible){warnVisible = true;}
+    function updateWarning(newText){
         warnText = newText+"<br>"+warnSuffix;
     }
 
-    function Hide(){loading.style.display = "none";}
+    export function show(text='Loading...'){
+        mainText = text;
+        warnText="Warning: might be slow for large files!";
+        loading.style.display = "flex";
+    }
+
+    function hide(){loading.style.display = "none";}
 
     export function handleMessage(message){
         switch(message.type){
 
+            case "load-start":
+            show(message.text);
+            break;
+            
             case "load-update":
-            UpdateText(message.text);
+            updateText(message.text);
             break;
 
             case "load-warning":
-            UpdateWarning(message.text);
+            updateWarning(message.text);
             break;
 
             case "load-end":
-            UpdateText("Loading done!");
-            Hide();
+            updateText("Loading done!");
+            hide();
             break;
         }
     }
@@ -47,7 +51,7 @@
 <div class="cont" bind:this={loading}>
     <div><span class="material-symbols-outlined loading">autorenew</span></div>
     <p>{mainText}</p>
-    <p class="warning" class:visible={warnVisible} bind:this={warning}>{@html warnText}</p>
+    <p class="warning">{@html warnText}</p>
 </div>
 
 
@@ -55,7 +59,8 @@
 
     .cont{
         background-color: var(--color-main-bg);
-        /* position: fixed; */
+        position: fixed;
+        z-index: 3;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -77,10 +82,6 @@
         font-size: var(--font-s);
         color: var(--color-warn);
         text-align: center;
-        opacity: 0;/* Initial state hidden */
-    }
-    .warning.visible{
-        opacity: 1; /* Visible state */
     }
 
     @keyframes spin {
