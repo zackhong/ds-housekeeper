@@ -1,7 +1,6 @@
 <script>
     import { tick } from 'svelte';
-    import { onMount } from 'svelte';
-	import { onDestroy } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     export let helpText="this is some helpful text";
     let isVisible = false;
     let x = 0;

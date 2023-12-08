@@ -1,16 +1,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600&display=swap');
 
 :root {
-    --color-main-bg: white;
+    --color-white-faint:rgba(255,255,255,0.7);
 
     --color-gray-1: #e0dfdf;
     --color-gray-3: #939393;
     --color-gray-5: #333;
+
+    --color-blue-1:rgb(230, 242, 254);
+    --color-blue-4:#007bff;
+    --color-blue-5:#005cbe;
+
+    --color-red-1:rgb(254, 230, 230);
+    --color-red-4:rgb(224, 10, 10);
+    --color-red-5:rgb(185, 7, 7);
     
-    --color-warn: rgb(224, 10, 10);
-    --color-warn-hover: rgb(185, 7, 7);
-    --color-link: #007bff;
-    --color-hover: #005cbe;
     --color-local: #008763;
     --color-remote: #a500be;
     --color-comp: #9747FF;
@@ -25,12 +29,14 @@
     --font-s: 12px;
     --font-m: 14px;
     --font-l: 18px;
+
+    --shadow: 0px 0px 2px var(--color-gray-3);
   }
   
   body {
     margin: 0px;
     padding: 0px;
-    background-color: var(--color-main-bg);
+    background-color: white;
   }
 
   p{
@@ -54,10 +60,13 @@
   }
 
   p.bold{font-weight: 600;}
-  
-  a {
-    color: var(--color-link);
-    text-decoration: none;
+
+  input{
+    font-family: 'Roboto Condensed', sans-serif;
+    font-weight: 400;
+    font-size: var(--font-m);
+    line-height: var(--font-m);
+    color: var(--color-gray-5);
   }
   
   /* Your other global styles here */

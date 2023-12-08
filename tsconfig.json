@@ -7,4 +7,5 @@
       "./node_modules/@figma"
     ]
   },
+  "include": ["src/**/*.ts"]
 }

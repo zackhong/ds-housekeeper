@@ -18,8 +18,6 @@
     //total no. of nodes using this style; -1 -> unscanned, 0 and above -> scanned
     export let totalCount = -1;
     export let pages;//using an associative array passed from plugin code
-
-    $: isScanned = (totalCount < 0) ? false: true;
 </script>
 
 
@@ -29,30 +27,30 @@
         {#if type=='text'}
             <TextInfo {...info}/>
         {:else if type=='color'}
-            <ColorInfo {...info}/>
+            <ColorInfo id={id} {...info}/>
         {:else if type=='comp'}
-            <CompInfo/>
+            <CompInfo isLocal={isLocal} id={id}/>
         {/if}
     </td>
     <td class="name">
-        <p class="large bold">{name}</p>
-        <div>
-            <Usage totalCount={totalCount} pages={pages}/>
-            <Button label={!isScanned? 'Scan' : 'Rescan'} 
-                size='small'
+        <div class="style-name">
+            <p class="large bold">{name}</p>
+            <!-- <p class="small">{id}</p> -->
+            {#if totalCount == 0 && isLocal}
+                <Button label='Delete' 
+                type='warning'
+                action='prompt-delete-style'
+                input={{id:id, type:type, name:name}}
                 hasTooltip=true 
-                tooltipText='Tracks every layer using this style.<br><br>Warning: might be slow for large file!' 
-                action='scan-{type}'
-                input={{id:id, name:name}}/>
+                tooltipText='Delete this style.'/>
+            {/if}
         </div>
-    </td>
-    <td class="actions">
-        {#if totalCount && totalCount.length == 0}
-            <Button label='Delete' type='warning'/>
-        {:else if totalCount && totalCount.length > 0}
-            <Button label='Delete' type='warning'/>
-            <Button label='Replace'/>
-        {/if}
+        <Usage 
+        totalCount={totalCount} 
+        pages={pages} 
+        id={id} 
+        type={type} 
+        name={name}/>
     </td>
 </tr>
 
@@ -85,18 +83,18 @@
         width: 100%;
     }
 
-    td.name div{
+    td.name .style-name{
         display: flex;
         flex-direction: row;
         align-items: center;
         column-gap: var(--size-s);
     }
 
-    td.actions{
-        display: flex;
-        flex-direction: column;
-        align-items: start;
-        row-gap: var(--size-xs);
+    td.name p.large{
+        max-width: 220px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
 
 </style>
