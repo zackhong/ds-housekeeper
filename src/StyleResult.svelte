@@ -7,17 +7,28 @@
     import ColorInfo from "./ColorInfo.svelte";
     import Usage from "./Usage.svelte";
     import CompInfo from "./CompInfo.svelte";
+    import {setContext} from 'svelte';
 
     //for formatting data of each style
-    export let id;
-    export let name;
-    export let isLocal=true;
-    export let type='text';
-    export let info;
+    export let id, name, isLocal=true, type='text', info;
 
     //total no. of nodes using this style; -1 -> unscanned, 0 and above -> scanned
-    export let totalCount = -1;
-    export let pages;//using an associative array passed from plugin code
+    //pages is an array of page ids, each with its own array of nodes that belong to it
+    export let totalCount, pages;
+
+    //info for this component's descendants to access w/o having to drill its props down
+    //eg no more <Child id={id} name={name}.../> and <GreatGrandChild id={id} name={name}.../>
+    setContext('styleInfo', {id, name, type});
+
+    //attached to delete button next to local style if scanning reveals 0 layers using it
+    function deleteStyle(){
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action:'popup-delete-style', type, styleID:id, styleName:name },
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
+
 </script>
 
 
@@ -39,10 +50,9 @@
             {#if totalCount == 0 && isLocal}
                 <Button label='Delete' 
                 type='warning'
-                action='prompt-delete-style'
-                input={{id:id, type:type, name:name}}
                 hasTooltip=true 
-                tooltipText='Delete this style.'/>
+                tooltipText='Delete this style.'
+                onClick={deleteStyle}/>
             {/if}
         </div>
         <Usage 

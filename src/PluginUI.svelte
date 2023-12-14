@@ -4,7 +4,7 @@
 	import Loading from './Loading.svelte';
 	import StyleDisplay from './StyleDisplay.svelte';
     import Tooltip from './Tooltip.svelte';
-	import PopupOptions from './PopupOptions.svelte';
+	import Options from './Options.svelte';
     import MenuBar from './MenuBar.svelte';
 
 	let loading;
@@ -14,58 +14,127 @@
 	let menu;
 	let popup;
 
-	//tells plugin code to start processing
-	parent.postMessage({ pluginMessage: {type: 'start'} },'*');
+	
+	
 
 	//dispatches messages from plugin code to child components
 	function onLoad(event) {
 
-		switch(event.data.pluginMessage.type){
+		let nextAction;
+		switch(event.data.pluginMessage.action){
 
-			case 'remote-text-complete':
-			parent.postMessage({ pluginMessage: {type: 'find-color'} },'*');
+			case 'display-text':
+			loading.updateText('Loading local color styles...');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-colors'} },'*'); }, 100 );
 			break;
 
-			case 'remote-color-complete':
+			case 'display-colors':
+			loading.updateText('Loading local components...');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-comps-start'} },'*'); }, 100 );
+			break;
+
+			//tells plugin to keep processing local components until it's all complete
+			case 'load-local-comps-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-comps-continue'} },'*'); }, 100 );
+			break;
+
+			case 'display-comps': case 'update-text': case 'update-color': case 'update-comp':
 			loading.hide();
 			break;
 
-			case 'remote-color-complete':
-			loading.hide();
+			case 'scan-text-progress': case 'scan-color-progress': case 'scan-comp-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
+			break;
+
+			//tells plugin to keep processing selection until it's complete
+			case 'select-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'select-continue'} },'*'); }, 100 );
+			break;
+
+			//tells plugin to keep deleting layers until it's complete
+			case 'delete-all-text-progress': case 'delete-all-color-progress': case 'delete-all-comp-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
+			break;
+
+			case 'delete-text-from-page-progress': case 'delete-color-from-page-progress': case 'delete-comp-from-page-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
 			break;
 		}
 
 		loading.handleMessage(event.data.pluginMessage);
-		menu.handleMessage(event.data.pluginMessage);
 		results.handleMessage(event.data.pluginMessage);
 	}
 
 	//listens to custom events from child components, then messages plugin code accordingly
-    onMount(() => { document.addEventListener('customEvent', handleCustomEvent); });
+    onMount(() => { 
+		document.addEventListener('customEvent', handleCustomEvent); 
+		//waits a while before telling plugin to initialize
+		loading.updateText('Loading local text styles...');
+		setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-text'} },'*'); }, 100 );
+	});
+
     onDestroy(() => {document.removeEventListener('customEvent', handleCustomEvent);});
 
 	function handleCustomEvent(event) {
-        switch(event.detail.type){
 
-			//tells plugin to keep processing the remote styles
-			case 'process-remote-text': case 'process-remote-color': case 'process-remote-comp':
-			parent.postMessage({ pluginMessage: {type: event.detail.type} },'*');
-			break;
+		let formattedType, customEvent;
+        switch(event.detail.action){
 
-			case 'scan-text': case 'scan-color': case 'scan-comp':
-			parent.postMessage({ pluginMessage: {type: event.detail.type, id: event.detail.input.id, name: event.detail.input.name} },'*');
+			case 'scan-text-start': case 'scan-color-start': case 'scan-comp-start':
+			loading.show(`Scanning ${event.detail.name} for usage...`);
+			setTimeout( ()=>{parent.postMessage({ pluginMessage: event.detail },'*');}, 100 );
 			break;
 
 			case 'view-local-comp':
-			parent.postMessage({ pluginMessage: {type: event.detail.type, id: event.detail.input.id} },'*');
+			parent.postMessage({ pluginMessage: event.detail },'*');
 			break;
 
-			case 'view-selection':
-			parent.postMessage({ pluginMessage: {type: event.detail.type, id: event.detail.input.id, nodeIDs: event.detail.input.nodeIDs} },'*');
+			case 'select-start':
+			parent.postMessage({ pluginMessage: event.detail },'*');
 			break;
 
 			case 'delete-text': case 'delete-color': case 'delete-comp':
-			parent.postMessage({ pluginMessage: {type: event.detail.type, id: event.detail.input.id} },'*');
+			parent.postMessage({ pluginMessage: event.detail },'*');
+			break;
+
+			case 'delete-all-layers-start':
+			//first put up loading screen
+			formattedType = (event.detail.type == 'comp')? 'instances' : 'layers';
+			loading.show(`Deleting all ${formattedType} from ${event.detail.name}...`);
+
+			//then tell style display to delete all layers from style
+			customEvent = new CustomEvent('customEvent', {
+				detail: { ...event.detail, action:'delete-all-layers'},
+				bubbles: true
+			});
+			document.dispatchEvent(customEvent);
+
+			//then tell plugin to delete all layers from style
+			setTimeout( ()=>{parent.postMessage({ pluginMessage: { ...event.detail, action:`delete-all-${event.detail.type}` }},'*');}, 100 );
+			break;
+
+			case 'delete-layers-page-start':
+			//first put up loading screen
+			formattedType = (event.detail.type == 'comp')? 'instances' : 'layers';
+			loading.show(`Deleting all ${formattedType} from ${event.detail.pageName}...`);
+
+			//then tell style display to delete all layers from style within this page
+			customEvent = new CustomEvent('customEvent', {
+				detail: { ...event.detail, action:`delete-layers-from-page`},
+				bubbles: true
+			});
+			document.dispatchEvent(customEvent);
+
+			//then tell plugin to delete all layers of this style from this page
+			setTimeout( ()=>{parent.postMessage({ pluginMessage: { ...event.detail, action:`delete-${event.detail.type}-from-page` }},'*');}, 100 );
 			break;
 		}
 	}
@@ -83,7 +152,7 @@
 <MenuBar bind:this={menu}/>
 <StyleDisplay bind:this={results}/>
 <Tooltip bind:this={tooltip}/>
-<PopupOptions bind:this={options}/>
+<Options bind:this={options}/>
 
 
 

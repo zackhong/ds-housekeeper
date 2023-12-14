@@ -4,6 +4,15 @@
 
     export let isLocal=true;
     export let id;
+
+    //handler attached to View button
+    function viewLocalComp(){
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action:'view-local-comp', id:id },
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
 </script>
 
 
@@ -13,8 +22,7 @@
     {#if isLocal}
         <Button label='View'
             type='secondary'
-            action='view-local-comp'
-            input={{id:id}}
+            onClick={viewLocalComp}
             hasIcon=true
             iconName='visibility'/>
     {/if}

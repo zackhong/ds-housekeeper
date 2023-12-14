@@ -2,15 +2,14 @@
     //displays results from plugin code
     import StyleResult from './StyleResult.svelte';
     import { onMount, onDestroy } from 'svelte';
+    import { resultMode, selectedSearch } from './stores.js';
 
     let display;
     let text=[];
     let colors=[];
     let comps=[];
-    let viewing = 'Text'; //'Text', 'Colors', 'Components', 'Search'
 
     let searchResult;//to be set when user selects an autocomplete result from the searchbar
-    let searchType;
 
     //checks if loading screen is running
     let isLoading = false;
@@ -34,144 +33,53 @@
         document.body.style.overflow = isLoading ? 'hidden' : '';
     }
 
+    //finds and displays selected style when user clicks on a result in the searchbar
+    $: if( $resultMode == 'Custom' ){
 
+        switch($selectedSearch.type){
 
+        case 'text':
+        searchResult = text.find( item => item.id == $selectedSearch.id );
+        break;
 
+        case 'color':
+        searchResult = colors.find( item => item.id == $selectedSearch.id );
+        break;
 
-    //checks all its list of styles that match input text from searchbar,
-    //then sends their names, if any, back to searchbar
-    function findMatch(value){
-
-        //compare both input string and style name in lowercase so that the search is case insensitive
-        value = value.toLowerCase();
-        let names=[];
-
-        for(const textEntry of text){
-            if(textEntry.name.toLowerCase().includes(value)){
-                names.push({id:textEntry.id, type:'text', name:textEntry.name});
-            }
-        }
-
-        for(const colorEntry of colors){
-            if(colorEntry.name.toLowerCase().includes(value)){
-                names.push({id:colorEntry.id, type:'color', name:colorEntry.name});
-            }
-        }
-
-        for(const compEntry of comps){
-            if(compEntry.name.toLowerCase().includes(value)){
-                names.push({id:compEntry.id, type:'comp', name:compEntry.name});
-            }
-        }
-
-        const customEvent = new CustomEvent('customEvent', {
-            detail: { type: 'found', input: names},
-            bubbles: true
-        });
-        document.dispatchEvent(customEvent);
-    }
-
-
-
-    //finds selected search result from searchbar and displays it
-    function showSelectedSearch(input){
-
-        searchType = input.type;
-        switch(input.type){
-
-            case 'text':
-            searchResult = text.find( item => item.id == input.id );
-            break;
-
-            case 'color':
-            searchResult = colors.find( item => item.id == input.id );
-            break;
-
-            case 'comp':
-            searchResult = comps.find( item => item.id == input.id );
-            break;
-        }
-        viewing = 'Search';
-    }
-
-    //deletes selected style; resets viewing mode based on which type of style was deleted
-    function deleteText(input){
-        text = text.filter( item => item.id != input.id );
-        if(viewing == 'Search'){ viewing = 'Text'; }
-    }
-
-    function deleteColor(input){
-        colors = colors.filter( item => item.id != input.id );
-        if(viewing == 'Search'){ viewing = 'Colors'; }
-    }
-
-    function deleteComp(input){
-        comps = comps.filter( item => item.id != input.id );
-        if(viewing == 'Search'){ viewing = 'Components'; }
-    }
-
-
-
-    //finds style according to id and update its usage
-    function updateStyle(message){
-        let updatedStyle;
-        switch(message.type){
-            case "update-text":
-            //finds the corresponding item inside text list, updates its totalCount and pages props, and remaps an enitrely new array
-            updatedStyle = text.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount} : item);
-            //use reassignment to trigger refresh on all Result components referencing this array
-            text = updatedStyle;
-            break;
-
-            case "update-color":
-            updatedStyle = colors.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount} : item);
-            colors = updatedStyle;
-            break;
-
-            case "update-comp":
-            updatedStyle = comps.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount} : item);
-            comps = updatedStyle;
-            break;
-        }
-        //update usage if it's currently showing selected search result
-        if(viewing == 'Search' && searchResult.id == message.id){
-            searchResult = {...searchResult, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount};
+        case 'comp':
+        searchResult = comps.find( item => item.id == $selectedSearch.id );
+        break;
         }
     }
+
+
+
 
     //handles custom events from other UI components
     function handleCustomEvent(event) {
-        switch(event.detail.type){
-
-			case 'display-option':
-			viewing = event.detail.input;
-			break;
+        switch(event.detail.action){
 
             case 'search':
-			findMatch(event.detail.input);
+			findMatch(event.detail.value);
 			break;
 
-            case 'search-selection':
-			showSelectedSearch(event.detail.input);
+            case 'delete-text': case 'delete-color': case 'delete-comp':
+			deleteStyle(event.detail);
 			break;
 
-            case 'delete-text':
-			deleteText(event.detail.input);
-			break;
+            case 'delete-all-layers':
+            deleteAllLayers(event.detail);
+            break;
 
-            case 'delete-color':
-			deleteColor(event.detail.input);
-			break;
-
-            case 'delete-comp':
-			deleteComp(event.detail.input);
-			break;
+            case 'delete-layers-from-page':
+            deleteLayersFromPage(event.detail);
+            break;
 		}
 	}
 
     //handles messages from plugin sent via pluginUI
     export function handleMessage(message){
-        switch(message.type){
+        switch(message.action){
 
             case "load-start":
             isLoading = true;
@@ -201,13 +109,193 @@
             break;
         }
     }
+
+
+
+
+    //----------------UPDATING STYLES
+    function updateStyle(message){
+        let updatedStyles;
+        switch(message.action){
+            case "update-text":
+            //finds the corresponding item inside text list, updates its totalCount and pages props, and remaps an enitrely new array
+            updatedStyles = text.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
+            //use reassignment to trigger refresh on all Result components referencing this array
+            text = updatedStyles;
+            break;
+
+            case "update-color":
+            updatedStyles = colors.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
+            colors = updatedStyles;
+            break;
+
+            case "update-comp":
+            updatedStyles = comps.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
+            comps = updatedStyles;
+            break;
+        }
+        //update usage if it's currently showing selected search result
+        if(resultMode == 'Custom' && searchResult.id == message.id){
+            searchResult = {...searchResult, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount};
+        }
+    }
+
+
+
+
+
+    //--------------------FINDS MATCHES FOR SEARCHBAR
+    function findMatch(value){
+
+        //compare both input string and style name in lowercase so that the search is case insensitive
+        value = value.toLowerCase();
+        let names=[];
+
+        for(const textEntry of text){
+            if(textEntry.name.toLowerCase().includes(value)){
+                names.push({id:textEntry.id, type:'text', name:textEntry.name});
+            }
+        }
+
+        for(const colorEntry of colors){
+            if(colorEntry.name.toLowerCase().includes(value)){
+                names.push({id:colorEntry.id, type:'color', name:colorEntry.name});
+            }
+        }
+
+        for(const compEntry of comps){
+            if(compEntry.name.toLowerCase().includes(value)){
+                names.push({id:compEntry.id, type:'comp', name:compEntry.name});
+            }
+        }
+
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action: 'found', names: names},
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
+
+
+
+
+    //-------------------DELETE OPERATIONS
+    function deleteStyle(detail){
+
+        let parts = detail.action.split('-');
+        switch(parts[1]){
+            case 'text':
+            text = text.filter( item => item.id != detail.id );
+            if($resultMode == 'Custom'){ resultMode.set('Text'); }
+            break;
+
+            case 'color':
+            colors = colors.filter( item => item.id != detail.id );
+            if($resultMode == 'Custom'){ resultMode.set('Colors'); }
+            break;
+
+            case 'comp':
+            comps = comps.filter( item => item.id != detail.id );
+            if($resultMode == 'Custom'){ resultMode.set('Components'); }
+            break;
+        }
+    }
+
+    //deletes all layers from selected style
+    function deleteAllLayers(detail){
+
+        //find target style
+        let updatedStyles;
+        //if we checked yes for deleting the style, just delete the entire entry from its corresponding list
+        //otherwise, just clear page info and total count from that style
+        switch(detail.type){
+
+            case 'text':
+                if(detail.deleteStyle){
+                    text = text.filter( item => item.id != detail.id );
+                    if($resultMode == 'Custom'){ resultMode.set('Text'); }
+                }
+                else{
+                    updatedStyles = text.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
+                    text = updatedStyles;
+                }
+            break;
+
+            case 'color':
+                if(detail.deleteStyle){
+                    colors = colors.filter( item => item.id != detail.id );
+                    if($resultMode == 'Custom'){ resultMode.set('Colors'); }
+                }
+                else{
+                    updatedStyles = colors.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
+                    colors = updatedStyles;
+                }
+            break;
+
+            case 'comp':
+                if(detail.deleteStyle){
+                    comps = comps.filter( item => item.id != detail.id );
+                    if($resultMode == 'Custom'){ resultMode.set('Components'); }
+                }
+                else{
+                    updatedStyles = comps.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
+                    comps = updatedStyles;
+                }
+            break;
+        }
+    }
+
+    //deletes layers/instances from selected style and page
+    function deleteLayersFromPage(detail){
+
+        let targetStyle, newPages, updatedStyles, newCount;
+        switch (detail.type){
+
+            case 'text':
+                targetStyle = text.find( item => item.id == detail.styleID );
+
+                newCount = targetStyle.totalCount - detail.nodeIDs.length;
+                newPages = targetStyle.pages.filter(pageInfo => pageInfo.id != detail.pageID);
+
+                targetStyle.totalCount = newCount;
+                targetStyle.pages = newPages;
+                updatedStyles = text.map( item => (item.id == detail.styleID)? targetStyle : item );
+                text = updatedStyles;
+            break;
+
+            case 'color':
+                targetStyle = colors.find( item => item.id == detail.styleID );
+
+                newCount = targetStyle.totalCount - detail.nodeIDs.length;
+                newPages = targetStyle.pages.filter(pageInfo => pageInfo.id != detail.pageID);
+
+                targetStyle.totalCount = newCount;
+                targetStyle.pages = newPages;
+                updatedStyles = colors.map( item => (item.id == detail.styleID)? targetStyle : item );
+                colors = updatedStyles;
+            break;
+
+            case 'comp':
+                targetStyle = comps.find( item => item.id == detail.styleID );
+
+                newCount = targetStyle.totalCount - detail.nodeIDs.length;
+                newPages = targetStyle.pages.filter(pageInfo => pageInfo.id != detail.pageID);
+
+                targetStyle.totalCount = newCount;
+                targetStyle.pages = newPages;
+                updatedStyles = comps.map( item => (item.id == detail.styleID)? targetStyle : item );
+                comps = updatedStyles;
+            break;
+        }
+    }
+
 </script>
 
 
 
 <table bind:this={display}>
     <tbody>
-        {#if viewing == 'Text'}
+        {#if $resultMode == 'Text'}
             {#if text.length > 0}
                 {#each text as textEntry}
                     <StyleResult type='text' {...textEntry}/>
@@ -217,7 +305,7 @@
             {/if}
         {/if}
         
-        {#if viewing == 'Colors'}
+        {#if $resultMode == 'Colors'}
             {#if colors.length > 0}
                 {#each colors as colorEntry}
                     <StyleResult type='color' {...colorEntry}/>
@@ -227,7 +315,7 @@
             {/if}
         {/if}
         
-        {#if viewing == 'Components'}
+        {#if $resultMode == 'Components'}
             {#if comps.length > 0}
                 {#each comps as compEntry}
                     <StyleResult type='comp' {...compEntry}/>
@@ -237,8 +325,8 @@
             {/if}
         {/if}
 
-        {#if viewing == 'Search'}
-            <StyleResult type={searchType} {...searchResult}/>
+        {#if $resultMode == 'Custom'}
+            <StyleResult type={$selectedSearch.type} {...searchResult}/>
         {/if}
     </tbody>
 </table>

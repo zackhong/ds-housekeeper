@@ -1,26 +1,14 @@
 <script>
     import Dropdown from "./Dropdown.svelte";
     import Search from "./SearchBar.svelte";
-
-    let dropdown;
-    let search;
-
-    let values = ['Text', 'Colors', 'Components'];
-
-    export function handleMessage(message){
-        switch(message.type){
-
-            //todo: send message to child components
-        }
-    }
 </script>
 
 
 
 
 <div class="main">
-    <Dropdown values = {values} width=108 bind:this={dropdown}/>
-    <Search bind:this={search}/>
+    <Dropdown width=108/>
+    <Search/>
 </div>
 
 

@@ -27,19 +27,13 @@
         });
     });
 
-    function updateText(newText){
+    export function updateText(newText){
         mainText = newText;
     }
 
-    //updates progress from plugin, then sends same message back to plugin to see if they stull have it
-    function updateProgress(message){
-
-        progressText = message.text;
-        const customEvent = new CustomEvent('customEvent', {
-            detail: { type: message.type},
-            bubbles: true
-        });
-        document.dispatchEvent(customEvent);
+    //updates progress from plugin, then sends same message back to plugin to see if they still have it
+    export function updateProgress(newText){
+        progressText = newText;
     }
 
     export function show(text='Loading...'){
@@ -54,7 +48,7 @@
     }
 
     export function handleMessage(message){
-        switch(message.type){
+        switch(message.action){
 
             case "load-start":
             show(message.text);
@@ -64,12 +58,11 @@
             updateText(message.text);
             break;
 
-            case "process-remote-text": case "process-remote-color":
-            updateProgress(message);
+            case "load-progress":
+            updateProgress(message.text);
             break;
 
             case "load-end":
-            updateText("Loading done!");
             hide();
             break;
         }

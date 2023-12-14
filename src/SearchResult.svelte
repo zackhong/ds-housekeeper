@@ -4,13 +4,13 @@
     export let id;
     export let type='text';
     export let name;
+    import { resultMode, selectedSearch, search} from './stores';
 
+    //sets viewing mode and selected search details when clicking on search result
     function handleClick(){
-        const customEvent = new CustomEvent('customEvent', {
-            detail: { type: 'search-selection', input: {id:id, type:type} },
-            bubbles: true
-        });
-        document.dispatchEvent(customEvent);
+        resultMode.set('Custom');
+        selectedSearch.set({id:id, type:type});
+        search.set({isSearching:false, text:''});
     }
 
 </script>

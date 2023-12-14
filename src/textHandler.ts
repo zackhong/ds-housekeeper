@@ -1,7 +1,8 @@
-let textStyles = new Set();
-let textNodes = [];
-let textIndex;
-let remoteTextToUI;
+let textStyles = new Set(), textNodes = [];
+let textIndex, remoteTextToUI;
+
+let uniqueConsumers, myIterator;
+
 
 
 
@@ -29,8 +30,6 @@ function processStyle(style, outArray, isLocal=true){
 //------------------FUNCTIONS FOR LOCAL STYLES
 export function getLocal(){
 
-  figma.ui.postMessage({type:"load-update", text:`Finding local text styles...`});
-
   const localTextStyles = figma.getLocalTextStyles();
   let textToUI = [];
 
@@ -43,7 +42,7 @@ export function getLocal(){
     }
   }
   //finally, convert processed text style  to serializable form
-  figma.ui.postMessage({type:"display-text", data: textToUI});
+  figma.ui.postMessage({action:"display-text", data: textToUI});
 }
 
 
@@ -53,7 +52,7 @@ export function getLocal(){
 export function getRemote(){
 
     // since there isn't a getRemoteTextStyles() method, we have to check every text node for text styles that aren't local
-    figma.ui.postMessage({type:"load-update", text:`Finding library text styles...`});
+    figma.ui.postMessage({action:"load-update", text:`Finding library text styles...`});
    
     //retrieve all text nodes in file
     textNodes = figma.root.findAllWithCriteria({ types: ["TEXT"]});
@@ -85,11 +84,11 @@ export function processRemoteChunk(chunkSize=100){
   //if we still have more text nodes to process, tell the UI to update loading screen progress
   //otherwise, send process remote text style info to UI
   if(chunk.length < chunkSize){
-    figma.ui.postMessage({type:"display-text", data:remoteTextToUI});
-    figma.ui.postMessage({type:"remote-text-complete"});
+    figma.ui.postMessage({action:"display-text", data:remoteTextToUI});
+    figma.ui.postMessage({action:"remote-text-complete"});
   }
   else{
-    figma.ui.postMessage({type:"process-remote-text", text:`Checking ${textIndex}/${textNodes.length} text layers...`});
+    figma.ui.postMessage({action:"process-remote-text", text:`Checking ${textIndex}/${textNodes.length} text layers...`});
   }
 }
 
@@ -99,26 +98,41 @@ export function processRemoteChunk(chunkSize=100){
 //gets no. of nodes using this style, sorted by page
 //since style.consumers seems to give us invalid nodes ie nodes that don't exist in any pages,
 //we'll have to count the no. of valid nodes manually
-export async function getUsage(message){
-
-  let outType = message.type.replace("scan", "update");
-  let outPages = [];
-  let totalCount = 0;
-
-  figma.ui.postMessage({type:"load-start", text:`Scanning ${message.name} for usage...`});
+export function getUsage(message){
 
   let consumers = figma.getStyleById(message.id).consumers;
   //pass the list of consumers into a set to remove duplicate consumers
-  let uniqueConsumers = new Set(consumers);
+  uniqueConsumers = new Set(consumers);
 
-  //process usage stats only if we have layers using that style
-  if(uniqueConsumers.size > 0){
+  //sends data back immediately if no consumers are found
+  if(uniqueConsumers.size == 0){
+    figma.ui.postMessage({action:'update-text', id:message.id, totalCount:0, pages:[]});
+  }
+  //otherwise, we start processing our consumers in chunks
+  else{
+    myIterator = usageIterator(message.id);
+    usageChunk();
+  }
+}
 
-    // Step 1: Group Node IDs by Page ID
-    let pageGroups = new Map();
+//generator function to iterate through set of unique consumers, either yields a "scan-text-progress" message
+//if there are more consumers to process, or yields the final output
+function* usageIterator(targetStyleID, chunkSize=100){
 
-    for(const consumer of uniqueConsumers){
+  let iterator = uniqueConsumers.values();
+  let outPages = [], totalCount = 0, pageGroups = new Map();
+  let done = false;
 
+  while(!done){
+
+    for (let i = 0; i < chunkSize; i++) {
+      let nextValue = iterator.next();
+      //exits the for loop if we've processed all nodes in uniqueConsumers
+      if(nextValue.done){
+        done = true;
+        break;
+      }
+      let consumer = nextValue.value;
       //get the corresponding page of each layer
       let page = findPageBottomUp(consumer.node as BaseNode);
 
@@ -136,11 +150,20 @@ export async function getUsage(message){
         totalCount++;
       }
     }
-    // Step 2: Convert to Desired Array Format
-    outPages = Array.from(pageGroups.values());
+    if (!done) { yield { action:'scan-text-progress', text:`Processing ${totalCount}/${uniqueConsumers.size} layers...`} ; }
   }
-  figma.ui.postMessage({type:outType, id:message.id, totalCount:totalCount, pages:outPages});
-  figma.ui.postMessage({type:"load-end"});
+
+  // After completing the iteration ie done == true, yield the final result
+  if (pageGroups.size > 0) {
+    outPages = Array.from(pageGroups.values());
+    yield { action:'update-text', id:targetStyleID, totalCount, pages:outPages };
+  }
+}
+
+//called by getUsage() or code.ts; just runs the generator function and post the yielded results
+export function usageChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
 }
 
 
@@ -160,7 +183,7 @@ function findPageBottomUp(node:BaseNode){
 }
 
 
-//deletes text style from user file and internal storage
+//--------DELETES STYLE FROM USER FILE
 export function deleteStyle(message){
 
   let textStyle = figma.getStyleById(message.id);
@@ -168,4 +191,68 @@ export function deleteStyle(message){
     textStyle.remove();
     textStyles.delete(textStyle);
   }
+}
+
+
+//--------DELETES ALL LAYERS FROM STYLE
+export function deleteAllLayers(message){
+  
+  myIterator = deleteAllIterator(message);
+  deleteAllChunk();
+}
+
+function* deleteAllIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  for(const page of message.pages){
+    for(const nodeID of page.nodeIDs){
+
+      let node = figma.getNodeById(nodeID);
+      if(node != null){ node.remove(); }
+
+      counter++;
+      //updates loading screen after deleting each chunk of nodes
+      if(counter % chunkSize == 0){
+        yield {action:'delete-all-text-progress', text:`Deleting ${counter} layers...`};
+      }
+    }
+  }
+  if(message.deleteStyle) { deleteStyle(message); }
+  yield {action:'load-end'};
+}
+
+export function deleteAllChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+//----------------DELETES LAYERS FROM GIVEN PAGE
+export function deleteFromPage(message){
+  
+  myIterator = deleteFromPageIterator(message);
+  deleteFromPageChunk();
+}
+
+function* deleteFromPageIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  for(const nodeID of message.nodeIDs){
+
+    let node = figma.getNodeById(nodeID);
+    if(node != null){ node.remove(); }
+
+    counter++;
+    //updates loading screen after deleting each chunk of nodes
+    if(counter % chunkSize == 0){
+      yield {action:'delete-text-from-page-progress', text:`Deleting ${counter} layers...`};
+    }
+  }
+  yield {action:'load-end'};
+}
+
+export function deleteFromPageChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
 }

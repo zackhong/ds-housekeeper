@@ -1,17 +1,16 @@
 <script>
-    export let id;
-    export let name;
-    export let nodeIDs;
+    import { options } from "./stores";
+    import {getContext} from 'svelte';
+
+    export let id, name, nodeIDs;
+    let styleInfo = getContext('styleInfo');
 
     function handleRightClick(event) {
         // Prevent the default context menu
         event.preventDefault();
-        
-        const customEvent = new CustomEvent('customEvent', {
-            detail: { type: "options-show", x:event.clientX, y:event.clientY, input:{id:id, nodeIDs:nodeIDs}},
-            bubbles: true
-        });
-        document.dispatchEvent(customEvent);
+        options.set({ isVisible:true, targetX:event.clientX, targetY:event.clientY, 
+                        type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, 
+                        pageID:id, pageName:name, nodeIDs});
     }
 
 </script>

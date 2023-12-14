@@ -5,23 +5,47 @@
     import { cubicOut } from 'svelte/easing';
     import PageInfo from './PageInfo.svelte';
     import Button from "./Button.svelte";
+    import {getContext} from 'svelte';
     
-    //total no. of nodes using this style; -1 -> unscanned, 0 and above -> scanned
-    export let totalCount = -1;
+    export let totalCount;
     export let pages;//using an associative array passed from plugin code
 
-    export let id;
-    export let type;
-    export let name;
+    let styleInfo = getContext('styleInfo');
+    let countText;
 
-    $: isScanned = (totalCount < 0) ? false: true;
     let isExpanded = false;
+    $: if(totalCount == undefined || totalCount == null){ 
+        countText = `? ${(styleInfo.type == 'comp')? 'instances': 'layers'}`; 
+    }
+    else if(totalCount == 1){ 
+        countText = `1 ${(styleInfo.type == 'comp')? 'instance': 'layer'}`; 
+    }
+    else{ 
+        countText = `${totalCount} ${(styleInfo.type == 'comp')? 'instances': 'layers'}`; 
+    }
 
     //toggles breakdown of pages, if any
     function handleClick(){
         isExpanded = !isExpanded;
     }
 
+    //handler attached to Scan/Rescan button
+    function scanStyle(){
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action:`scan-${styleInfo.type}-start`, id:styleInfo.id, name:styleInfo.name },
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
+
+    //attached to delete button next to all layers
+    function deleteAllLayers(){
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action:'popup-delete-all-layers', type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, pages },
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
 </script>
 
 
@@ -29,16 +53,12 @@
 <div class="main">
     <div class="header">
         <div>
-            <p class={isScanned? (totalCount > 0? 'has-count': 'no-count'): 'not-scanned'} >
-                {#if !isScanned}
-                    ? layers
-                {:else if totalCount == 1}
-                    {totalCount} layer
-                {:else}
-                    {totalCount} layers
-                {/if}
-            </p>
-            {#if isScanned && totalCount > 0}
+            {#if totalCount == undefined || totalCount == null}
+                <p class="not-scanned">{countText}</p>
+            {:else if totalCount == 0}
+                <p class="no-count">{countText}</p>
+            {:else}
+                <p class="has-count">{countText}</p>
                 <!-- include this comment below to tell Svelte to STFU about accesibility warnings when coding -->
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
                 <span class="material-symbols-outlined icon" on:click={handleClick}>{isExpanded? 'expand_less' : 'expand_more'}</span>
@@ -46,13 +66,12 @@
         </div>
         
         <!-- list of actions applying to this style-->
-        <Button label={!isScanned? 'Scan' : 'Rescan'} 
+        <Button label={(totalCount == undefined || totalCount == null)? 'Scan' : 'Rescan'} 
                 hasTooltip=true 
                 tooltipText='Tracks every layer using this style.<br><br>Warning: might be slow for large file!' 
-                action='scan-{type}'
-                input={{id:id, name:name}}/>
+                onClick={scanStyle}/>
 
-        {#if isScanned && totalCount > 0}
+        {#if !(totalCount == undefined || totalCount == null) && totalCount > 0}
 
             <Button label='Swap' 
                 type='secondary'
@@ -62,12 +81,13 @@
             <Button label='Delete' 
                 type='warning'
                 hasTooltip=true 
-                tooltipText='Deletes all layers using this style.'/>
+                tooltipText='Deletes all layers using this style.'
+                onClick={deleteAllLayers}/>
         {/if}
     </div>
 
     <!-- list of pages, if any -->
-    {#if isScanned && totalCount > 0 && isExpanded}
+    {#if totalCount && totalCount > 0 && isExpanded}
         <div class="body" transition:slide={{duration:200, easing:cubicOut}}>
             {#each pages as page}
                 <PageInfo {...page}/>

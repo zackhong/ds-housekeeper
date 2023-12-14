@@ -5,9 +5,9 @@
     import { slide } from 'svelte/transition';
     import { cubicOut } from 'svelte/easing';
     import SearchResult from './SearchResult.svelte';
+    import { search } from './stores';
 
     let placeholder='Search...';
-    let text;//ref to typed text inside searchbar; doesn't affect placeholder
 
     export let width=180;
     let height=24;
@@ -17,8 +17,7 @@
     let typingChars=2;//min # of chars that user needs to type to trigger search
     let typingDelay=300;//delay in ms; used for calling autocomplete when user has stopped typing
 
-    let isSearching = false;
-    let search;
+    let self;
     let results;
 
     onMount(() => {
@@ -31,64 +30,69 @@
         window.removeEventListener('click', handleClickOutside);
     });
 
+    //handles custom events from other UI components
+    function handleCustomEvent(event) {
+        switch(event.detail.action){
+
+			case 'found':
+			results = event.detail.names;
+			break;
+		}
+	}
+
+
+
+
+
     // Hides searchbar results & cancels search if we click anywhere outside it
     function handleClickOutside(event) {
-        if (isSearching && !search.contains(event.target)) {
-            text='';
-            isSearching = false;
+        if ($search.isSearching && !self.contains(event.target)) {
+            search.set({isSearching:false, text:''});
         }
     }
 
+    // starts timer to trigger findMatch() after a set delay
     function handleInput(event) {
-        clearTimeout(typingTimer); // Clear the previous timer
+        //clears the previous trigger if user is typing continously
+        clearTimeout(typingTimer);
+        //only triggers findMatch() if user is typing, and typed letters reach a certain length of chars
         if (event.target.value && event.target.value.length >= typingChars) {
             typingTimer = setTimeout(()=>{findMatch(event.target.value)}, typingDelay);
         }
     }
 
+    //tells display to return all matches based on this input string
     function findMatch(value) {
-        //send string to ResultDisplay asking it to return 1st 5 matches from its list of styles found
+        
         const customEvent = new CustomEvent('customEvent', {
-            detail: { type: 'search', input: value},
+            detail: { action: 'search', value: value},
             bubbles: true
         });
         document.dispatchEvent(customEvent);
-        isSearching = true;
+        search.update(current => {
+            return {...current, isSearching:true};
+        });
     }
-
-    //handles custom events from other UI components
-    function handleCustomEvent(event) {
-        switch(event.detail.type){
-
-			case 'found':
-			results = event.detail.input;
-			break;
-
-            //hide search results when one of them is clicked
-            case 'search-selection':
-			isSearching = false;
-            //clears typed text
-            text = '';
-			break;
-		}
-	}
 
 </script>
 
 
 
 
-<div class="main" bind:this={search}>
+<div class="main" bind:this={self}>
     <div class="header" style="width:{width}px; height:{height}px;" >
-        <input type="text" placeholder={placeholder} bind:value={text} maxlength={maxChars} on:input={handleInput}/>
-        <!-- <p contenteditable="true" on:input={handleInput}>{text}</p> -->
+        <input type="text" placeholder={placeholder} bind:value={$search.text} maxlength={maxChars} on:input={handleInput}/>
         <span class="material-symbols-outlined icon">search</span>
     </div>
-    {#if isSearching}
+    {#if $search.isSearching}
         <div class="body" style="width:{width}px;" transition:slide={{duration:200, easing:cubicOut}}>
-            {#each results as result}
-                <SearchResult {...result}/>
-            {/each}
+            {#if results.length > 0}
+                {#each results as result}
+                    <SearchResult {...result}/>
+                {/each}
+            {:else}
+                <div><p class="no-results">No results found.</p></div>
+            {/if}
         </div>
     {/if}
 </div>
@@ -152,6 +156,11 @@
         overflow: scroll;
 
         box-shadow: var(--shadow);
+    }
+
+    .no-results{ 
+        color: var(--color-gray-3); 
+        padding: var(--size-xs);
     }
 
 </style>
