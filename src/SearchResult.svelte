@@ -4,24 +4,18 @@
     export let id;
     export let type='text';
     export let name;
-    import { resultMode, selectedSearch, search} from './stores';
 
-    //sets viewing mode and selected search details when clicking on search result
-    function handleClick(){
-        resultMode.set('Custom');
-        selectedSearch.set({id:id, type:type});
-        search.set({isSearching:false, text:''});
-    }
+    export let onSelect = () => {};//handler for when one of its results is selected
 
 </script>
 
 
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
-<div on:click={handleClick}>
+<div on:click={onSelect(id,type,name)}>
     {#if type == 'text'}
         <span class="material-symbols-outlined icon">format_size</span>
     {:else if type == 'color'}
-        <span class="material-symbols-outlined icon">lens</span>
+        <span class="material-symbols-outlined icon">colors</span>
     {:else}
         <span class="material-symbols-outlined icon comp">grid_view</span>
     {/if}

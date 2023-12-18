@@ -2,12 +2,10 @@
     //displays results from plugin code
     import StyleResult from './StyleResult.svelte';
     import { onMount, onDestroy } from 'svelte';
-    import { resultMode, selectedSearch } from './stores.js';
+    import { displayMode, selectedSearch, results } from './stores.js';
 
     let display;
-    let text=[];
-    let colors=[];
-    let comps=[];
+    $: ({text, colors, comps}= $results);
 
     let searchResult;//to be set when user selects an autocomplete result from the searchbar
 
@@ -34,7 +32,7 @@
     }
 
     //finds and displays selected style when user clicks on a result in the searchbar
-    $: if( $resultMode == 'Custom' ){
+    $: if( $displayMode == 'Custom' ){
 
         switch($selectedSearch.type){
 
@@ -59,11 +57,11 @@
     function handleCustomEvent(event) {
         switch(event.detail.action){
 
-            case 'search':
-			findMatch(event.detail.value);
-			break;
+            // case 'search':
+			// findMatch(event.detail.value);
+			// break;
 
-            case 'delete-text': case 'delete-color': case 'delete-comp':
+            case 'delete-style':
 			deleteStyle(event.detail);
 			break;
 
@@ -90,18 +88,24 @@
             break;
 
             case "display-text":
-            text.push(...message.data);
-            text=[...text];
+            results.update(currResults => {
+                const newText = [...currResults.text, ...message.data];
+                return {...currResults, text:newText};
+            });
             break;
 
             case "display-colors":
-            colors.push(...message.data);
-            colors=[...colors];
+            results.update(currResults => {
+                const newColors = [...currResults.colors, ...message.data];
+                return {...currResults, colors:newColors};
+            });
             break;
 
             case "display-comps":
-            comps.push(...message.data);
-            comps=[...comps];
+            results.update(currResults => {
+                const newComps = [...currResults.comps, ...message.data];
+                return {...currResults, comps:newComps};
+            });
             break;
 
             case "update-text": case "update-color": case "update-comp":
@@ -121,21 +125,27 @@
             //finds the corresponding item inside text list, updates its totalCount and pages props, and remaps an enitrely new array
             updatedStyles = text.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
             //use reassignment to trigger refresh on all Result components referencing this array
-            text = updatedStyles;
+            results.update(currResults => {
+                return {...currResults, text:updatedStyles}
+            });
             break;
 
             case "update-color":
             updatedStyles = colors.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
-            colors = updatedStyles;
+            results.update(currResults => {
+                return {...currResults, colors:updatedStyles}
+            });
             break;
 
             case "update-comp":
             updatedStyles = comps.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
-            comps = updatedStyles;
+            results.update(currResults => {
+                return {...currResults, comps:updatedStyles}
+            });
             break;
         }
         //update usage if it's currently showing selected search result
-        if(resultMode == 'Custom' && searchResult.id == message.id){
+        if(displayMode == 'Custom' && searchResult.id == message.id){
             searchResult = {...searchResult, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount};
         }
     }
@@ -145,36 +155,37 @@
 
 
     //--------------------FINDS MATCHES FOR SEARCHBAR
-    function findMatch(value){
+    // function findMatch(value){
 
-        //compare both input string and style name in lowercase so that the search is case insensitive
-        value = value.toLowerCase();
-        let names=[];
+    //     //compare both input string and style name in lowercase so that the search is case insensitive
+    //     value = value.toLowerCase();
+    //     let names=[];
 
-        for(const textEntry of text){
-            if(textEntry.name.toLowerCase().includes(value)){
-                names.push({id:textEntry.id, type:'text', name:textEntry.name});
-            }
-        }
+    //     for(const textEntry of text){
+    //         if(textEntry.name.toLowerCase().includes(value)){
+    //             names.push({id:textEntry.id, type:'text', name:textEntry.name});
+    //         }
+    //     }
 
-        for(const colorEntry of colors){
-            if(colorEntry.name.toLowerCase().includes(value)){
-                names.push({id:colorEntry.id, type:'color', name:colorEntry.name});
-            }
-        }
+    //     for(const colorEntry of colors){
+    //         if(colorEntry.name.toLowerCase().includes(value)){
+    //             names.push({id:colorEntry.id, type:'color', name:colorEntry.name});
+    //         }
+    //     }
 
-        for(const compEntry of comps){
-            if(compEntry.name.toLowerCase().includes(value)){
-                names.push({id:compEntry.id, type:'comp', name:compEntry.name});
-            }
-        }
+    //     for(const compEntry of comps){
+    //         if(compEntry.name.toLowerCase().includes(value)){
+    //             names.push({id:compEntry.id, type:'comp', name:compEntry.name});
+    //         }
+    //     }
 
-        const customEvent = new CustomEvent('customEvent', {
-            detail: { action: 'found', names: names},
-            bubbles: true
-        });
-        document.dispatchEvent(customEvent);
-    }
+    //     const customEvent = new CustomEvent('customEvent', {
+    //         detail: { action: 'found', names: names},
+    //         bubbles: true
+    //     });
+    //     document.dispatchEvent(customEvent);
+    // }
+
 
 
 
@@ -182,21 +193,30 @@
     //-------------------DELETE OPERATIONS
     function deleteStyle(detail){
 
-        let parts = detail.action.split('-');
-        switch(parts[1]){
+        switch(detail.type){
             case 'text':
-            text = text.filter( item => item.id != detail.id );
-            if($resultMode == 'Custom'){ resultMode.set('Text'); }
+            const newText = text.filter( item => item.id != detail.id );
+            results.update(currResults => {
+                return {...currResults, text:newText}
+            });
+            if($displayMode == 'Custom'){ displayMode.set('Text'); }
             break;
 
             case 'color':
-            colors = colors.filter( item => item.id != detail.id );
-            if($resultMode == 'Custom'){ resultMode.set('Colors'); }
+            const newColors = colors.filter( item => item.id != detail.id );
+            console.log(newColors.length);
+            results.update(currResults => {
+                return {...currResults, colors:newColors}
+            });
+            if($displayMode == 'Custom'){ displayMode.set('Colors'); }
             break;
 
             case 'comp':
-            comps = comps.filter( item => item.id != detail.id );
-            if($resultMode == 'Custom'){ resultMode.set('Components'); }
+            const newComps = comps.filter( item => item.id != detail.id );
+            results.update(currResults => {
+                return {...currResults, comps:newComps}
+            });
+            if($displayMode == 'Custom'){ displayMode.set('Components'); }
             break;
         }
     }
@@ -207,41 +227,31 @@
         //find target style
         let updatedStyles;
         //if we checked yes for deleting the style, just delete the entire entry from its corresponding list
+        if(detail.deleteStyle){ deleteStyle(detail); }
         //otherwise, just clear page info and total count from that style
-        switch(detail.type){
-
-            case 'text':
-                if(detail.deleteStyle){
-                    text = text.filter( item => item.id != detail.id );
-                    if($resultMode == 'Custom'){ resultMode.set('Text'); }
-                }
-                else{
+        else{
+            switch(detail.type){
+                case 'text':
                     updatedStyles = text.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
-                    text = updatedStyles;
-                }
-            break;
+                    results.update(currResults => {
+                        return {...currResults, text:updatedStyles}
+                    });
+                break;
 
-            case 'color':
-                if(detail.deleteStyle){
-                    colors = colors.filter( item => item.id != detail.id );
-                    if($resultMode == 'Custom'){ resultMode.set('Colors'); }
-                }
-                else{
+                case 'color':
                     updatedStyles = colors.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
-                    colors = updatedStyles;
-                }
-            break;
+                    results.update(currResults => {
+                        return {...currResults, colors:updatedStyles}
+                    });
+                break;
 
-            case 'comp':
-                if(detail.deleteStyle){
-                    comps = comps.filter( item => item.id != detail.id );
-                    if($resultMode == 'Custom'){ resultMode.set('Components'); }
-                }
-                else{
+                case 'comp':
                     updatedStyles = comps.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
-                    comps = updatedStyles;
-                }
-            break;
+                    results.update(currResults => {
+                        return {...currResults, comps:updatedStyles}
+                    });
+                break;
+            }
         }
     }
 
@@ -260,7 +270,9 @@
                 targetStyle.totalCount = newCount;
                 targetStyle.pages = newPages;
                 updatedStyles = text.map( item => (item.id == detail.styleID)? targetStyle : item );
-                text = updatedStyles;
+                results.update(currResults => {
+                    return {...currResults, text:updatedStyles}
+                });
             break;
 
             case 'color':
@@ -272,7 +284,9 @@
                 targetStyle.totalCount = newCount;
                 targetStyle.pages = newPages;
                 updatedStyles = colors.map( item => (item.id == detail.styleID)? targetStyle : item );
-                colors = updatedStyles;
+                results.update(currResults => {
+                    return {...currResults, colors:updatedStyles}
+                });
             break;
 
             case 'comp':
@@ -284,7 +298,9 @@
                 targetStyle.totalCount = newCount;
                 targetStyle.pages = newPages;
                 updatedStyles = comps.map( item => (item.id == detail.styleID)? targetStyle : item );
-                comps = updatedStyles;
+                results.update(currResults => {
+                    return {...currResults, comps:updatedStyles}
+                });
             break;
         }
     }
@@ -295,7 +311,7 @@
 
 <table bind:this={display}>
     <tbody>
-        {#if $resultMode == 'Text'}
+        {#if $displayMode == 'Text'}
             {#if text.length > 0}
                 {#each text as textEntry}
                     <StyleResult type='text' {...textEntry}/>
@@ -305,7 +321,7 @@
             {/if}
         {/if}
         
-        {#if $resultMode == 'Colors'}
+        {#if $displayMode == 'Colors'}
             {#if colors.length > 0}
                 {#each colors as colorEntry}
                     <StyleResult type='color' {...colorEntry}/>
@@ -315,7 +331,7 @@
             {/if}
         {/if}
         
-        {#if $resultMode == 'Components'}
+        {#if $displayMode == 'Components'}
             {#if comps.length > 0}
                 {#each comps as compEntry}
                     <StyleResult type='comp' {...compEntry}/>
@@ -325,7 +341,7 @@
             {/if}
         {/if}
 
-        {#if $resultMode == 'Custom'}
+        {#if $displayMode == 'Custom'}
             <StyleResult type={$selectedSearch.type} {...searchResult}/>
         {/if}
     </tbody>

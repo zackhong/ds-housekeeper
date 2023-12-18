@@ -676,5 +676,6 @@ figma.ui.onmessage = message => {
         case 'delete-comp-from-page-continue':
             deleteFromPageChunk();
             break;
+        //-------------SWAP ALL LAYERS OF SELECTED STYLE
     }
 };

@@ -101,8 +101,8 @@
 			parent.postMessage({ pluginMessage: event.detail },'*');
 			break;
 
-			case 'delete-text': case 'delete-color': case 'delete-comp':
-			parent.postMessage({ pluginMessage: event.detail },'*');
+			case 'delete-style':
+			parent.postMessage({ pluginMessage: { ...event.detail, action:`delete-${event.detail.type}` } },'*');
 			break;
 
 			case 'delete-all-layers-start':

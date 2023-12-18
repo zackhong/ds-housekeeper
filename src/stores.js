@@ -13,11 +13,12 @@ export const options = writable({
     pageID: '', pageName:'', nodeIDs: []
 });
 
-export const resultMode = writable('Text'); // 'Text', 'Colors', 'Components', 'Custom'
+export const displayMode = writable('Text'); // 'Text', 'Colors', 'Components', 'Custom'
 
 export const search = writable({
     isSearching:false,
-    text:''
+    text:'',
+    results:[]
 });
 
 export const selectedSearch = writable({
@@ -25,9 +26,8 @@ export const selectedSearch = writable({
     type:""
 });
 
-export const popup = writable({
-    isVisible: false,
-    mode:'', // 'default', 'delete-style', 'delete-all-layers', 'delete-layers-from-page', 'swap-all-layers', 'swap-layers-from-page'
-    styleType: '', styleID: '', styleName:'',
-    pageID: '', pageName: '', nodeIDs:[]
+export const results = writable({
+    text:[],
+    colors:[],
+    comps:[]
 });

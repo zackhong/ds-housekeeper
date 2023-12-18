@@ -17,28 +17,20 @@
     let typingChars=2;//min # of chars that user needs to type to trigger search
     let typingDelay=300;//delay in ms; used for calling autocomplete when user has stopped typing
 
-    let self;
-    let results;
+    let self;//ref to self; used to check if we clicked outside it
+
+    export let onInputChange = () => {}; // click handler; takes in function from other components
+    export let onSelect = () => {};//handler for when one of its results is selected
 
     onMount(() => {
-        document.addEventListener('customEvent', handleCustomEvent);
+        // document.addEventListener('customEvent', handleCustomEvent);
         window.addEventListener('click', handleClickOutside);
     });
 
     onDestroy(() => {
-        document.removeEventListener('customEvent', handleCustomEvent);
+        // document.removeEventListener('customEvent', handleCustomEvent);
         window.removeEventListener('click', handleClickOutside);
     });
-
-    //handles custom events from other UI components
-    function handleCustomEvent(event) {
-        switch(event.detail.action){
-
-			case 'found':
-			results = event.detail.names;
-			break;
-		}
-	}
 
 
 
@@ -57,21 +49,8 @@
         clearTimeout(typingTimer);
         //only triggers findMatch() if user is typing, and typed letters reach a certain length of chars
         if (event.target.value && event.target.value.length >= typingChars) {
-            typingTimer = setTimeout(()=>{findMatch(event.target.value)}, typingDelay);
+            typingTimer = setTimeout(onInputChange(event.target.value), typingDelay);
         }
-    }
-
-    //tells display to return all matches based on this input string
-    function findMatch(value) {
-        
-        const customEvent = new CustomEvent('customEvent', {
-            detail: { action: 'search', value: value},
-            bubbles: true
-        });
-        document.dispatchEvent(customEvent);
-        search.update(current => {
-            return {...current, isSearching:true};
-        });
     }
 
 </script>
@@ -86,9 +65,9 @@
     </div>
     {#if $search.isSearching}
         <div class="body" style="width:{width}px;" transition:slide={{duration:200, easing:cubicOut}}>
-            {#if results.length > 0}
-                {#each results as result}
-                    <SearchResult {...result}/>
+            {#if $search.results.length > 0}
+                {#each $search.results as result}
+                    <SearchResult {...result} onSelect={onSelect}/>
                 {/each}
             {:else}
                 <div><p class="no-results">No results found.</p></div>

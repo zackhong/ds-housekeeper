@@ -2,14 +2,20 @@
     import { onMount, onDestroy } from 'svelte';
     import { slide } from 'svelte/transition';
     import { cubicOut } from 'svelte/easing';
-    import { resultMode } from './stores.js';
+    
 
     export let width=100;
     let height=24;
-    let options = ['Text', 'Colors', 'Components'];
+    export let options = ['lorem ipsum'];
 
     let isExpanded = false;
+    let selected;
+    $: selected = options[0];
+
+    //ref to self; used for checking if we clicked outside it
     let dropdown;
+
+    export let onClick = () => {}; // click handler; takes in function from other components
 
     onMount(() => {
         window.addEventListener('click', handleClickOutside);
@@ -31,12 +37,16 @@
         isExpanded = !isExpanded;
     }
 
-    //updates selection based on which option we clicked; telling style display to update accordingly as well
     function updateSelection(option){
-        //if we selected a new option, update dropdown & display
-        if($resultMode != option){ resultMode.set(option); }
+        selected = option;
         isExpanded = false;
+        onClick(option);
     }
+
+    export function setSelection(value){
+        selected = value;
+    }
+
 </script>
 
 
@@ -44,14 +54,14 @@
 
 <div class="main" bind:this={dropdown}>
     <button class="header" style="width:{width}px; height:{height}px;" on:click={toggle}>
-        <p>{$resultMode}</p>
+        <p class='ellipsis'>{selected}</p>
         <span class="material-symbols-outlined icon">{isExpanded? 'expand_less' : 'expand_more'}</span>
     </button>
     {#if isExpanded}
         <div class="body" style="width:{width}px;" transition:slide={{duration:200, easing:cubicOut}}>
             {#each options as option}
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
-                <div class="option" on:click={()=>updateSelection(option)}><p>{option}</p></div>
+                <div class="option ellipsis" on:click={ ()=> {updateSelection(option)} }><p>{option}</p></div>
             {/each}
         </div>
     {/if}
@@ -66,6 +76,7 @@
         display: flex;
         flex-direction: column;
         align-items: start;
+        position: relative;
     }
 
     .header{
@@ -91,7 +102,7 @@
 
     .body{
         position: absolute;
-        top: 32px;
+        top: 24px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -113,6 +124,12 @@
         margin-left: var(--size-s);
         color: var(--color-blue-4);
         cursor: default;
+    }
+
+    .ellipsis{
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
 
     .option:hover{

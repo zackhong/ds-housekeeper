@@ -38,6 +38,15 @@
         document.dispatchEvent(customEvent);
     }
 
+    //attached to swap button
+    function swapAllLayers(){
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action:'popup-swap-all-layers', type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, pages },
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
+
     //attached to delete button next to all layers
     function deleteAllLayers(){
         const customEvent = new CustomEvent('customEvent', {
@@ -76,7 +85,8 @@
             <Button label='Swap' 
                 type='secondary'
                 hasTooltip=true 
-                tooltipText='Swaps all layers to use another relevant style.'/>
+                tooltipText='Swaps all layers to use another relevant style.'
+                onClick={swapAllLayers}/>
 
             <Button label='Delete' 
                 type='warning'
