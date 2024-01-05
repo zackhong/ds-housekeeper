@@ -54,6 +54,11 @@
     line-height: var(--font-s);
   }
 
+  p.medium{
+    font-size: var(--font-m);
+    line-height: var(--font-m);  
+  }
+
   p.large{
     font-size: var(--font-l);
     line-height: var(--font-l);

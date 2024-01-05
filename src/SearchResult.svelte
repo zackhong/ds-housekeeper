@@ -36,6 +36,8 @@
         box-sizing: border-box;
         width: 100%;
         padding: var(--size-xs);
+
+        cursor: default;
     }
 
     div:hover{

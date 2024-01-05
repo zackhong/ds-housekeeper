@@ -2,7 +2,7 @@
     import { options } from './stores';
     import { tick, onMount, onDestroy } from 'svelte';
 
-    $: ({ isVisible, targetX, targetY, 
+    $: ({ isVisible, canSwap, targetX, targetY, 
             type, styleID, styleName,
             pageID, pageName, nodeIDs } = $options);
     let optionsEl, x=0, y=0;
@@ -73,7 +73,7 @@
         options.set({isVisible:false});
         
         const customEvent = new CustomEvent('customEvent', {
-            detail: { action:'popup-swap-at-page', 
+            detail: { action:'popup-swap-from-page', 
                         type, styleID, styleName,
                         pageID, pageName, nodeIDs},
             bubbles: true
@@ -90,8 +90,10 @@
     <div class="options" style="left:{x}px; top:{y}px;" bind:this={optionsEl}>
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
         <div on:click={handleView}><p class="small">View</p></div>
-        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
-        <div on:click={handleView}><p class="small">Swap</p></div>
+        {#if canSwap}
+            <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
+            <div on:click={swapAtPage}><p class="small">Swap</p></div>
+        {/if}
         <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
         <div class="warning" on:click={deleteFromPage}><p class="small">Delete</p></div>
     </div>    

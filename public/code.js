@@ -1,6 +1,6 @@
 'use strict';
 
-let textStyles = new Set();
+let textStyles = new Set(), textNodes = [];
 let uniqueConsumers$1, myIterator$2;
 //--------------HELPER FUNCTIONS
 function processStyle$1(style, outArray, isLocal = true) {
@@ -37,6 +37,38 @@ function getLocal$1() {
     }
     //finally, convert processed text style  to serializable form
     figma.ui.postMessage({ action: "display-text", data: textToUI });
+}
+//--------FUNCTIONS FOR GETTING REMOTE STYLES
+function getRemote() {
+    myIterator$2 = remoteIterator();
+    swapFromPageChunk$2();
+}
+// since there isn't a getRemoteTextStyles() method, we have to check every text node for text styles that aren't local
+function* remoteIterator(chunkSize = 100) {
+    let counter = 0, textToUI = [];
+    //retrieve all text nodes in file
+    textNodes = figma.root.findAllWithCriteria({ types: ["TEXT"] });
+    for (const node of textNodes) {
+        //check if this node's style is already included in the current list of text styles;
+        //if not, then this style must be remote
+        let styleID = String(node.textStyleId);
+        if (styleID && !styleID.includes('Symbol') && !textStyles.has(styleID)) {
+            let style = figma.getStyleById(styleID);
+            if (style) {
+                processStyle$1(style, textToUI, false);
+            }
+        }
+        counter++;
+        //updates loading screen after deleting each chunk of nodes
+        if (counter % chunkSize == 0) {
+            yield { action: 'load-remote-text-progress', text: `Checking ${counter} text layers...` };
+        }
+    }
+    yield { action: 'display-remote-text', data: textToUI };
+}
+function remoteChunk() {
+    let nextChunk = myIterator$2.next();
+    figma.ui.postMessage(nextChunk.value);
 }
 //------------SEARCH FUNCTIONS
 //gets no. of nodes using this style, sorted by page
@@ -172,6 +204,71 @@ function* deleteFromPageIterator$2(message, chunkSize = 100) {
     yield { action: 'load-end' };
 }
 function deleteFromPageChunk$2() {
+    let nextChunk = myIterator$2.next();
+    figma.ui.postMessage(nextChunk.value);
+}
+//--------SWAPS ALL LAYERS FROM STYLE
+function swapAllLayers$2(message) {
+    myIterator$2 = swapAllIterator$1(message);
+    swapAllChunk$2();
+}
+function* swapAllIterator$1(message, chunkSize = 100) {
+    let counter = 0;
+    for (const page of message.pages) {
+        for (const nodeID of page.nodeIDs) {
+            let node = figma.getNodeById(nodeID);
+            if (node != null) {
+                node.textStyleId = message.swapID;
+            }
+            counter++;
+            //updates loading screen after deleting each chunk of nodes
+            if (counter % chunkSize == 0) {
+                yield { action: 'swap-all-text-progress', text: `Swapping ${counter} layers...` };
+            }
+        }
+    }
+    if (message.deleteStyle) {
+        deleteStyle$2(message);
+    }
+    //rescans swapped style if necessary
+    if (message.rescanSwapped) {
+        yield { action: 'scan-text-start', id: message.swapID, name: message.swapName };
+    }
+    else {
+        yield { action: 'load-end' };
+    }
+}
+function swapAllChunk$2() {
+    let nextChunk = myIterator$2.next();
+    figma.ui.postMessage(nextChunk.value);
+}
+//----------------SWAPS LAYERS FROM GIVEN PAGE
+function swapFromPage$2(message) {
+    myIterator$2 = swapFromPageIterator$2(message);
+    swapFromPageChunk$2();
+}
+function* swapFromPageIterator$2(message, chunkSize = 100) {
+    let counter = 0;
+    for (const nodeID of message.nodeIDs) {
+        let node = figma.getNodeById(nodeID);
+        if (node != null) {
+            node.textStyleId = message.swapID;
+        }
+        counter++;
+        //updates loading screen after deleting each chunk of nodes
+        if (counter % chunkSize == 0) {
+            yield { action: 'swap-text-from-page-progress', text: `Swapping ${counter} layers...` };
+        }
+    }
+    //rescans swapped style if necessary
+    if (message.rescanSwapped) {
+        yield { action: 'scan-text-start', id: message.swapID, name: message.swapName };
+    }
+    else {
+        yield { action: 'load-end' };
+    }
+}
+function swapFromPageChunk$2() {
     let nextChunk = myIterator$2.next();
     figma.ui.postMessage(nextChunk.value);
 }
@@ -354,6 +451,81 @@ function* deleteFromPageIterator$1(message, chunkSize = 100) {
     yield { action: 'load-end' };
 }
 function deleteFromPageChunk$1() {
+    let nextChunk = myIterator$1.next();
+    figma.ui.postMessage(nextChunk.value);
+}
+//--------SWAPS ALL LAYERS FROM STYLE
+function swapAllLayers$1(message) {
+    myIterator$1 = swapAllIterator(message);
+    swapAllChunk$1();
+}
+function* swapAllIterator(message, chunkSize = 100) {
+    let counter = 0;
+    for (const page of message.pages) {
+        for (const nodeID of page.nodeIDs) {
+            let node = figma.getNodeById(nodeID);
+            if (node != null) {
+                if (node.fillStyleId == message.id) {
+                    node.fillStyleId = message.swapID;
+                }
+                if (node.strokeStyleId == message.id) {
+                    node.strokeStyleId = message.swapID;
+                }
+            }
+            counter++;
+            //updates loading screen after deleting each chunk of nodes
+            if (counter % chunkSize == 0) {
+                yield { action: 'swap-all-color-progress', text: `Swapping ${counter} layers...` };
+            }
+        }
+    }
+    if (message.deleteStyle) {
+        deleteStyle$1(message);
+    }
+    //rescans swapped style if necessary
+    if (message.rescanSwapped) {
+        yield { action: 'scan-color-start', id: message.swapID, name: message.swapName };
+    }
+    else {
+        yield { action: 'load-end' };
+    }
+}
+function swapAllChunk$1() {
+    let nextChunk = myIterator$1.next();
+    figma.ui.postMessage(nextChunk.value);
+}
+//----------------SWAPS LAYERS FROM GIVEN PAGE
+function swapFromPage$1(message) {
+    myIterator$1 = swapFromPageIterator$1(message);
+    swapFromPageChunk$1();
+}
+function* swapFromPageIterator$1(message, chunkSize = 100) {
+    let counter = 0;
+    for (const nodeID of message.nodeIDs) {
+        let node = figma.getNodeById(nodeID);
+        if (node != null) {
+            if (node.fillStyleId == message.styleID) {
+                node.fillStyleId = message.swapID;
+            }
+            if (node.strokeStyleId == message.styleID) {
+                node.strokeStyleId = message.swapID;
+            }
+        }
+        counter++;
+        //updates loading screen after deleting each chunk of nodes
+        if (counter % chunkSize == 0) {
+            yield { action: 'swap-color-from-page-progress', text: `Swapping ${counter} layers...` };
+        }
+    }
+    //rescans swapped style if necessary
+    if (message.rescanSwapped) {
+        yield { action: 'scan-color-start', id: message.swapID, name: message.swapName };
+    }
+    else {
+        yield { action: 'load-end' };
+    }
+}
+function swapFromPageChunk$1() {
     let nextChunk = myIterator$1.next();
     figma.ui.postMessage(nextChunk.value);
 }
@@ -542,6 +714,83 @@ function deleteFromPageChunk() {
     let nextChunk = myIterator.next();
     figma.ui.postMessage(nextChunk.value);
 }
+//----------------------SWAPS ALL LAYERS FROM STYLE
+function swapAllLayers(message) {
+    myIterator = swapIterator(message);
+    swapAllChunk();
+}
+function* swapIterator(message, chunkSize = 100) {
+    let counter = 0;
+    let swapNode = figma.getNodeById(message.swapID);
+    //if swapped node is variant, we want instances to swap to its first child by default
+    if (swapNode.type == 'COMPONENT_SET') {
+        swapNode = swapNode.children[0];
+    }
+    for (const page of message.pages) {
+        for (const nodeID of page.nodeIDs) {
+            let node = figma.getNodeById(nodeID);
+            if (node != null) {
+                //swaps instance to use another component
+                node.swapComponent(swapNode);
+            }
+            counter++;
+            //updates loading screen after deleting each chunk of nodes
+            if (counter % chunkSize == 0) {
+                yield { action: 'swap-all-comp-progress', text: `Swapping ${counter} instances...` };
+            }
+        }
+    }
+    if (message.deleteStyle) {
+        deleteStyle(message);
+    }
+    //rescans swapped style if necessary
+    if (message.rescanSwapped) {
+        yield { action: 'scan-comp-start', id: message.swapID, name: message.swapName };
+    }
+    else {
+        yield { action: 'load-end' };
+    }
+}
+function swapAllChunk() {
+    let nextChunk = myIterator.next();
+    figma.ui.postMessage(nextChunk.value);
+}
+//----------------SWAPS LAYERS FROM GIVEN PAGE
+function swapFromPage(message) {
+    myIterator = swapFromPageIterator(message);
+    swapFromPageChunk();
+}
+function* swapFromPageIterator(message, chunkSize = 100) {
+    let counter = 0;
+    let swapNode = figma.getNodeById(message.swapID);
+    //if swapped node is variant, we want instances to swap to its first child by default
+    if (swapNode.type == 'COMPONENT_SET') {
+        swapNode = swapNode.children[0];
+    }
+    for (const nodeID of message.nodeIDs) {
+        let node = figma.getNodeById(nodeID);
+        if (node != null) {
+            //swaps instance to use another component
+            node.swapComponent(swapNode);
+        }
+        counter++;
+        //updates loading screen after deleting each chunk of nodes
+        if (counter % chunkSize == 0) {
+            yield { action: 'swap-comp-from-page-progress', text: `Swapping ${counter} instances...` };
+        }
+    }
+    //rescans swapped style if necessary
+    if (message.rescanSwapped) {
+        yield { action: 'scan-comp-start', id: message.swapID, name: message.swapName };
+    }
+    else {
+        yield { action: 'load-end' };
+    }
+}
+function swapFromPageChunk() {
+    let nextChunk = myIterator.next();
+    figma.ui.postMessage(nextChunk.value);
+}
 
 let limit = 50, selectIterator;
 function viewSelection(message) {
@@ -586,7 +835,7 @@ figma.skipInvisibleInstanceChildren = false; //set to true to optimise node sear
 figma.showUI(__html__, { width: 400, height: 600 });
 figma.ui.onmessage = message => {
     switch (message.action) {
-        //-----INITIAL LOADING SEQUENCE
+        //-----LOAD LOCAL STYLES (CALLED ON INITIAL LOAD)
         case 'load-local-text':
             getLocal$1();
             break;
@@ -598,6 +847,13 @@ figma.ui.onmessage = message => {
             break;
         case 'load-local-comps-continue':
             processLocalChunk();
+            break;
+        //-------LOAD REMOTE STYLES
+        case 'load-remote-text-start':
+            getRemote();
+            break;
+        case 'load-remote-text-continue':
+            remoteChunk();
             break;
         //-------SCAN STYLE FOR USAGE
         case 'scan-text-start':
@@ -676,6 +932,43 @@ figma.ui.onmessage = message => {
         case 'delete-comp-from-page-continue':
             deleteFromPageChunk();
             break;
-        //-------------SWAP ALL LAYERS OF SELECTED STYLE
+        //-------------SWAP ALL LAYERS FROM STYLE
+        case 'swap-all-text':
+            swapAllLayers$2(message);
+            break;
+        case 'swap-all-text-continue':
+            swapAllChunk$2();
+            break;
+        case 'swap-all-color':
+            swapAllLayers$1(message);
+            break;
+        case 'swap-all-color-continue':
+            swapAllChunk$1();
+            break;
+        case 'swap-all-comp':
+            swapAllLayers(message);
+            break;
+        case 'swap-all-comp-continue':
+            swapAllChunk();
+            break;
+        //-------------SWAP LAYERS FROM PAGE
+        case 'swap-text-from-page':
+            swapFromPage$2(message);
+            break;
+        case 'swap-text-from-page-continue':
+            swapFromPageChunk$2();
+            break;
+        case 'swap-color-from-page':
+            swapFromPage$1(message);
+            break;
+        case 'swap-color-from-page-continue':
+            swapFromPageChunk$1();
+            break;
+        case 'swap-comp-from-page':
+            swapFromPage(message);
+            break;
+        case 'swap-comp-from-page-continue':
+            swapFromPageChunk();
+            break;
     }
 };

@@ -1,12 +1,18 @@
 <script>
     import Dropdown from "./Dropdown.svelte";
     import Search from "./SearchBar.svelte";
-    import { displayMode, selectedSearch, search, results } from './stores.js';
+    import Button from "./Button.svelte";
+    import { displayMode, selectedSearch, results } from './stores.js';
     import { onMount, onDestroy } from 'svelte';
 
     let dropdown;
-    let options = ['Text', 'Colors', 'Components'];
+    let options = [{id:'text', value:'Text'}, 
+                    {id:'color',value:'Colors'}, 
+                    {id:'comp', value:'Components'}];
     let searchbar;
+    let searchState = {isSearching:false,
+                        text:'',
+                        results:[]};
 
     onMount(() => {
         document.addEventListener('customEvent', handleCustomEvent);
@@ -30,12 +36,18 @@
 
 
 
+    //-----------STYLE DROPDOWN
     //updates selection based on which option we clicked; telling style display to update accordingly as well
     function updateSelection(option){
         //if we selected a new option, update dropdown & display
-        if($displayMode != option){ displayMode.set(option); }
+        if($displayMode != option.id){ displayMode.set(option.id); }
     }
 
+
+
+
+
+    //-----------STYLE SEARCHBAR
     //tells display to return all matches based on this input string
     function findMatch(value) {
 
@@ -61,16 +73,17 @@
             }
         }
 
-        search.update(current => {
-            return {...current, isSearching:true, results:outResults};
-        });
+        searchState.isSearching = true;
+        searchState.results = outResults;
     }
 
     //sets viewing mode and selected search details when clicking on search result
     function selectResult(id, type, name){
-        displayMode.set('Custom');
+
+        displayMode.set('custom');
         selectedSearch.set({id, type});
-        search.set({isSearching:false, text:name});
+        searchState.isSearching = false;
+        searchState.text = name;
 
         const customEvent = new CustomEvent('customEvent', {
             detail: { action: 'set-dropdown-to-custom', value:'Custom'},
@@ -78,14 +91,58 @@
         });
         document.dispatchEvent(customEvent);
     }
+
+
+
+
+
+
+    //-----------------SEARCH REMOTE STYLES
+    function loadRemoteStyles(){
+
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action: 'load-remote-text-start'},
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
+
+
+
+
+
+
+
+    //-----------------RESET UI
 </script>
 
 
 
 
 <div class="main">
-    <Dropdown width=108 options={options} onClick={updateSelection} bind:this={dropdown}/>
-    <Search onInputChange={findMatch} onSelect={selectResult} bind:this={searchbar}/>
+    <div class='row'>
+        <Dropdown width=108 options={options} onClick={updateSelection} bind:this={dropdown}/>
+        <Search onInputChange={findMatch} onSelect={selectResult} bind:this={searchbar} bind:isSearching={searchState.isSearching} bind:text={searchState.text} bind:results={searchState.results}/>
+    </div>
+    <div class='row'>
+        <Button 
+            label='Search Remote'
+            size='large'
+            hasTooltip=true
+            tooltipText='Search file for imported styles.<br><br>Warning: slow for large files!'
+            onClick={loadRemoteStyles}
+        />
+        <Button 
+            label='Reset UI'
+            hasIcon=true
+            iconName='restart_alt'
+            type='secondary'
+            size='large'
+            hasTooltip=true
+            tooltipText="Resets UI to only display local styles.<br><br>Use this if you\'ve modified your file outside this plugin."
+        />
+    </div>
+    
 </div>
 
 
@@ -99,12 +156,17 @@
 		z-index: 3;
 
 		display: flex;
-        flex-direction: row;
-        justify-content: space-between;
+        flex-direction: column;
         row-gap: var(--size-xs);
         padding: var(--size-s);
 
 		background-color: white;
 		box-shadow: var(--shadow);
 	}
+
+    .row{
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+    }
 </style>

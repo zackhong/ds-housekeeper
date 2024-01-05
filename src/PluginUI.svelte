@@ -6,17 +6,32 @@
     import Tooltip from './Tooltip.svelte';
 	import Options from './Options.svelte';
     import MenuBar from './MenuBar.svelte';
+	import { results } from './stores.js';
 
 	let loading;
-	let results;
+	let resultDisplay;
 	let tooltip;
 	let options;
 	let menu;
 	let popup;
 
+
+
+
 	
+	onMount(() => { 
+		document.addEventListener('customEvent', handleCustomEvent); 
+		//waits a while before telling plugin to initialize
+		loading.updateText('Loading local text styles...');
+		setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-text'} },'*'); }, 100 );
+	});
+
+    onDestroy(() => {document.removeEventListener('customEvent', handleCustomEvent);});
+
 	
 
+	
+	//coordinates actions btw UI and plugin via messages,
 	//dispatches messages from plugin code to child components
 	function onLoad(event) {
 
@@ -41,6 +56,37 @@
 
 			case 'display-comps': case 'update-text': case 'update-color': case 'update-comp':
 			loading.hide();
+			results.update(currResults => {
+                return {...currResults, canScroll:true};
+            });
+			break;
+
+
+
+
+
+
+			//--------------LOADING REMOTE STYLES
+			case 'load-remote-text-progress': case 'load-remote-color-progress': case 'load-remote-comp-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
+			break;
+
+			case 'display-remote-text':
+			resultDisplay.handleMessage({action: 'display-text', data: event.data.pluginMessage.data});
+			loading.hide();
+			// loading.updateText('Loading remote color styles...');
+			// setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-remote-colors-start'} },'*'); }, 100 );
+			break;
+
+
+
+
+			//----------SCANNING AND SELECTING LAYERS
+			case 'scan-text-start': case 'scan-color-start': case 'scan-comp-start':
+			loading.updateText(`Updating ${event.data.pluginMessage.name}...`);
+			setTimeout( ()=>{parent.postMessage({ pluginMessage: event.data.pluginMessage },'*');}, 100 );
 			break;
 
 			case 'scan-text-progress': case 'scan-color-progress': case 'scan-comp-progress':
@@ -55,6 +101,11 @@
 			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'select-continue'} },'*'); }, 100 );
 			break;
 
+
+
+
+
+			//-----------DELETING LAYERS
 			//tells plugin to keep deleting layers until it's complete
 			case 'delete-all-text-progress': case 'delete-all-color-progress': case 'delete-all-comp-progress':
 			loading.updateProgress(event.data.pluginMessage.text);
@@ -67,27 +118,40 @@
 			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
 			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
 			break;
+
+
+
+
+
+			//----------SWAPPING LAYERS
+			//tells plugin to keep swapping layers until it's complete
+			case 'swap-all-text-progress': case 'swap-all-color-progress': case 'swap-all-comp-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
+			break;
+
+			case 'swap-text-from-page-progress': case 'swap-color-from-page-progress': case 'swap-comp-from-page-progress':
+			loading.updateProgress(event.data.pluginMessage.text);
+			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
+			break;
 		}
 
 		loading.handleMessage(event.data.pluginMessage);
-		results.handleMessage(event.data.pluginMessage);
+		resultDisplay.handleMessage(event.data.pluginMessage);
 	}
 
-	//listens to custom events from child components, then messages plugin code accordingly
-    onMount(() => { 
-		document.addEventListener('customEvent', handleCustomEvent); 
-		//waits a while before telling plugin to initialize
-		loading.updateText('Loading local text styles...');
-		setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-text'} },'*'); }, 100 );
-	});
 
-    onDestroy(() => {document.removeEventListener('customEvent', handleCustomEvent);});
 
+
+	//handles custom events from UI components
 	function handleCustomEvent(event) {
 
 		let formattedType, customEvent;
         switch(event.detail.action){
 
+			//---------SCANNING AND VIEWING
 			case 'scan-text-start': case 'scan-color-start': case 'scan-comp-start':
 			loading.show(`Scanning ${event.detail.name} for usage...`);
 			setTimeout( ()=>{parent.postMessage({ pluginMessage: event.detail },'*');}, 100 );
@@ -101,6 +165,20 @@
 			parent.postMessage({ pluginMessage: event.detail },'*');
 			break;
 
+			
+
+
+
+			//---------LOAD REMOTE STYLES
+			case 'load-remote-text-start':
+			loading.show('Loading remote text styles...');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: event.detail.action} },'*'); }, 100 );
+			break;
+
+
+
+
+			//--------DELETING STYLES AND LAYERS
 			case 'delete-style':
 			parent.postMessage({ pluginMessage: { ...event.detail, action:`delete-${event.detail.type}` } },'*');
 			break;
@@ -136,11 +214,47 @@
 			//then tell plugin to delete all layers of this style from this page
 			setTimeout( ()=>{parent.postMessage({ pluginMessage: { ...event.detail, action:`delete-${event.detail.type}-from-page` }},'*');}, 100 );
 			break;
+
+
+
+
+
+			//----------SWAPPING LAYERS
+			case 'swap-all-layers-start':
+			//first put up loading screen
+			formattedType = (event.detail.type == 'comp')? 'instances' : 'layers';
+			loading.show(`Swapping all <b>${event.detail.name}</b> ${formattedType} to <b>${event.detail.swapName}</b>...`);
+
+			//then tell style display to swap all layers from style
+			customEvent = new CustomEvent('customEvent', {
+				detail: { ...event.detail, action:'swap-all-layers'},
+				bubbles: true
+			});
+			document.dispatchEvent(customEvent);
+
+			//then tell plugin to swap all layers from style
+			setTimeout( ()=>{parent.postMessage({ pluginMessage: { ...event.detail, action:`swap-all-${event.detail.type}` }},'*');}, 100 );
+			break;
+
+			case 'swap-layers-page-start':
+			//first put up loading screen
+			formattedType = (event.detail.type == 'comp')? 'instances' : 'layers';
+			loading.show(`Swapping all <b>${event.detail.styleName}</b> ${formattedType} to <b>${event.detail.swapName}</b> in <b>${event.detail.pageName}</b>...`);
+
+			//then tell style display to delete all layers from style within this page
+			customEvent = new CustomEvent('customEvent', {
+				detail: { ...event.detail, action:`swap-layers-from-page`},
+				bubbles: true
+			});
+			document.dispatchEvent(customEvent);
+
+			//then tell plugin to delete all layers of this style from this page
+			setTimeout( ()=>{parent.postMessage({ pluginMessage: { ...event.detail, action:`swap-${event.detail.type}-from-page` }},'*');}, 100 );
+			break;
 		}
 	}
 
 </script>
-
 
 
 
@@ -150,9 +264,10 @@
 <Loading bind:this={loading}/>
 <Modal bind:this={popup}/>
 <MenuBar bind:this={menu}/>
-<StyleDisplay bind:this={results}/>
+<StyleDisplay bind:this={resultDisplay}/>
 <Tooltip bind:this={tooltip}/>
 <Options bind:this={options}/>
+
 
 
 

@@ -7,19 +7,15 @@ export const tooltip = writable({
 });
 
 export const options = writable({
-    isVisible: false,
+    isVisible: false, canSwap:false,
     targetX: 0, targetY: 0,
     styleID:'', styleName:'', type:'',
     pageID: '', pageName:'', nodeIDs: []
 });
 
-export const displayMode = writable('Text'); // 'Text', 'Colors', 'Components', 'Custom'
-
-export const search = writable({
-    isSearching:false,
-    text:'',
-    results:[]
-});
+// determines what type of styles to display
+// possilbe values: 'text', 'color', 'comp, 'custom'
+export const displayMode = writable('text'); 
 
 export const selectedSearch = writable({
     id:"",
@@ -27,7 +23,7 @@ export const selectedSearch = writable({
 });
 
 export const results = writable({
-    text:[],
-    colors:[],
-    comps:[]
+    text:[], colors:[], comps:[],
+    canSwapText:false, canSwapColors:false, canSwapComps:false,
+    canScroll:true
 });

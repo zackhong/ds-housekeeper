@@ -74,7 +74,7 @@
     {#if isFontLoaded}
         <div><span class="material-symbols-outlined loading">autorenew</span></div>
     {/if}
-    <p>{mainText}</p>
+    <p class='main'>{@html mainText}</p>
     {#if progressText}
         <p class="progress">{progressText}</p>
     {/if}
@@ -118,6 +118,11 @@
         color: var(--color-gray-5);
         animation-name: spin;
         animation: spin 3s linear infinite;
+    }
+
+    .main{
+        text-align: center;
+        max-width: 300px;
     }
 
     .progress{

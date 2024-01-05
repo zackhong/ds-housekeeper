@@ -4,48 +4,36 @@
     import { onMount, onDestroy } from 'svelte';
     import { displayMode, selectedSearch, results } from './stores.js';
 
-    let display;
-    $: ({text, colors, comps}= $results);
-
     let searchResult;//to be set when user selects an autocomplete result from the searchbar
-
-    //checks if loading screen is running
-    let isLoading = false;
+    let scrollClass = $results.canScroll ? '' : 'no-scroll';
 
 
 
 
 
     onMount(() => {
-        updateBodyScroll();
         document.addEventListener('customEvent', handleCustomEvent);
     });
 
     onDestroy(() => {
-        document.body.style.overflow = ''; // Reset when the component is destroyed
         document.removeEventListener('customEvent', handleCustomEvent);
     });
 
-    //toggles the overflow style porperty of the document body to disable scrollbars from appearing when loading screen is running
-    function updateBodyScroll() {
-        document.body.style.overflow = isLoading ? 'hidden' : '';
-    }
-
     //finds and displays selected style when user clicks on a result in the searchbar
-    $: if( $displayMode == 'Custom' ){
+    $: if( $displayMode == 'custom' ){
 
         switch($selectedSearch.type){
 
         case 'text':
-        searchResult = text.find( item => item.id == $selectedSearch.id );
+        searchResult = $results.text.find( item => item.id == $selectedSearch.id );
         break;
 
         case 'color':
-        searchResult = colors.find( item => item.id == $selectedSearch.id );
+        searchResult = $results.colors.find( item => item.id == $selectedSearch.id );
         break;
 
         case 'comp':
-        searchResult = comps.find( item => item.id == $selectedSearch.id );
+        searchResult = $results.comps.find( item => item.id == $selectedSearch.id );
         break;
         }
     }
@@ -56,10 +44,6 @@
     //handles custom events from other UI components
     function handleCustomEvent(event) {
         switch(event.detail.action){
-
-            // case 'search':
-			// findMatch(event.detail.value);
-			// break;
 
             case 'delete-style':
 			deleteStyle(event.detail);
@@ -72,6 +56,14 @@
             case 'delete-layers-from-page':
             deleteLayersFromPage(event.detail);
             break;
+
+            case 'swap-all-layers':
+            swapAllLayers(event.detail);
+            break;
+
+            case 'swap-layers-from-page':
+            swapLayersFromPage(event.detail);
+            break;
 		}
 	}
 
@@ -80,11 +72,15 @@
         switch(message.action){
 
             case "load-start":
-            isLoading = true;
+            results.update(currResults => {
+                return {...currResults, canScroll:false};
+            });
             break;
 
             case "load-end":
-            isLoading = false;
+            results.update(currResults => {
+                return {...currResults, canScroll:true};
+            });
             break;
 
             case "display-text":
@@ -92,6 +88,7 @@
                 const newText = [...currResults.text, ...message.data];
                 return {...currResults, text:newText};
             });
+            updateSwappableText();
             break;
 
             case "display-colors":
@@ -99,6 +96,7 @@
                 const newColors = [...currResults.colors, ...message.data];
                 return {...currResults, colors:newColors};
             });
+            updateSwappableColors();
             break;
 
             case "display-comps":
@@ -106,6 +104,7 @@
                 const newComps = [...currResults.comps, ...message.data];
                 return {...currResults, comps:newComps};
             });
+            updateSwappableComps();
             break;
 
             case "update-text": case "update-color": case "update-comp":
@@ -123,7 +122,7 @@
         switch(message.action){
             case "update-text":
             //finds the corresponding item inside text list, updates its totalCount and pages props, and remaps an enitrely new array
-            updatedStyles = text.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
+            updatedStyles = $results.text.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
             //use reassignment to trigger refresh on all Result components referencing this array
             results.update(currResults => {
                 return {...currResults, text:updatedStyles}
@@ -131,21 +130,21 @@
             break;
 
             case "update-color":
-            updatedStyles = colors.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
+            updatedStyles = $results.colors.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
             results.update(currResults => {
                 return {...currResults, colors:updatedStyles}
             });
             break;
 
             case "update-comp":
-            updatedStyles = comps.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
+            updatedStyles = $results.comps.map(item => item.id === message.id ? {...item, totalCount: message.totalCount, pages: message.pages} : item);
             results.update(currResults => {
                 return {...currResults, comps:updatedStyles}
             });
             break;
         }
         //update usage if it's currently showing selected search result
-        if(displayMode == 'Custom' && searchResult.id == message.id){
+        if(displayMode == 'custom' && searchResult.id == message.id){
             searchResult = {...searchResult, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount};
         }
     }
@@ -154,37 +153,36 @@
 
 
 
-    //--------------------FINDS MATCHES FOR SEARCHBAR
-    // function findMatch(value){
 
-    //     //compare both input string and style name in lowercase so that the search is case insensitive
-    //     value = value.toLowerCase();
-    //     let names=[];
 
-    //     for(const textEntry of text){
-    //         if(textEntry.name.toLowerCase().includes(value)){
-    //             names.push({id:textEntry.id, type:'text', name:textEntry.name});
-    //         }
-    //     }
+    //----------------UPDATES WHICH STYLES ARE SWAPPABLE
+    function updateSwappableText(){
+        if($results.text.length > 1) {
+            results.update(currResults => { return {...currResults, canSwapText:true} });
+        }
+        else{
+            results.update(currResults => { return {...currResults, canSwapText:false} });
+        }
+    }
 
-    //     for(const colorEntry of colors){
-    //         if(colorEntry.name.toLowerCase().includes(value)){
-    //             names.push({id:colorEntry.id, type:'color', name:colorEntry.name});
-    //         }
-    //     }
+    function updateSwappableColors(){
+        if($results.colors.length > 1) {
+            results.update(currResults => { return {...currResults, canSwapColors:true} });
+        }
+        else{
+            results.update(currResults => { return {...currResults, canSwapColors:false} });
+        }
+    }
 
-    //     for(const compEntry of comps){
-    //         if(compEntry.name.toLowerCase().includes(value)){
-    //             names.push({id:compEntry.id, type:'comp', name:compEntry.name});
-    //         }
-    //     }
+    function updateSwappableComps(){
+        if($results.comps.length > 1) {
+            results.update(currResults => { return {...currResults, canSwapComps:true} });
+        }
+        else{
+            results.update(currResults => { return {...currResults, canSwapComps:false} });
+        }
+    }
 
-    //     const customEvent = new CustomEvent('customEvent', {
-    //         detail: { action: 'found', names: names},
-    //         bubbles: true
-    //     });
-    //     document.dispatchEvent(customEvent);
-    // }
 
 
 
@@ -195,28 +193,24 @@
 
         switch(detail.type){
             case 'text':
-            const newText = text.filter( item => item.id != detail.id );
-            results.update(currResults => {
-                return {...currResults, text:newText}
-            });
-            if($displayMode == 'Custom'){ displayMode.set('Text'); }
+            const newText = $results.text.filter( item => item.id != detail.id );
+            results.update(currResults => { return {...currResults, text:newText} });
+            updateSwappableText();
+            if($displayMode == 'custom'){ displayMode.set('text'); }
             break;
 
             case 'color':
-            const newColors = colors.filter( item => item.id != detail.id );
-            console.log(newColors.length);
-            results.update(currResults => {
-                return {...currResults, colors:newColors}
-            });
-            if($displayMode == 'Custom'){ displayMode.set('Colors'); }
+            const newColors = $results.colors.filter( item => item.id != detail.id );
+            results.update(currResults => { return {...currResults, colors:newColors} });
+            updateSwappableColors();
+            if($displayMode == 'custom'){ displayMode.set('color'); }
             break;
 
             case 'comp':
-            const newComps = comps.filter( item => item.id != detail.id );
-            results.update(currResults => {
-                return {...currResults, comps:newComps}
-            });
-            if($displayMode == 'Custom'){ displayMode.set('Components'); }
+            const newComps = $results.comps.filter( item => item.id != detail.id );
+            results.update(currResults => { return {...currResults, comps:newComps} });
+            updateSwappableComps();
+            if($displayMode == 'custom'){ displayMode.set('comp'); }
             break;
         }
     }
@@ -232,21 +226,21 @@
         else{
             switch(detail.type){
                 case 'text':
-                    updatedStyles = text.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
+                    updatedStyles = $results.text.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
                     results.update(currResults => {
                         return {...currResults, text:updatedStyles}
                     });
                 break;
 
                 case 'color':
-                    updatedStyles = colors.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
+                    updatedStyles = $results.colors.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
                     results.update(currResults => {
                         return {...currResults, colors:updatedStyles}
                     });
                 break;
 
                 case 'comp':
-                    updatedStyles = comps.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
+                    updatedStyles = $results.comps.map(item => item.id === detail.id ? {...item, totalCount:0, pages:[]} : item);
                     results.update(currResults => {
                         return {...currResults, comps:updatedStyles}
                     });
@@ -262,42 +256,42 @@
         switch (detail.type){
 
             case 'text':
-                targetStyle = text.find( item => item.id == detail.styleID );
+                targetStyle = $results.text.find( item => item.id == detail.styleID );
 
                 newCount = targetStyle.totalCount - detail.nodeIDs.length;
                 newPages = targetStyle.pages.filter(pageInfo => pageInfo.id != detail.pageID);
 
                 targetStyle.totalCount = newCount;
                 targetStyle.pages = newPages;
-                updatedStyles = text.map( item => (item.id == detail.styleID)? targetStyle : item );
+                updatedStyles = $results.text.map( item => (item.id == detail.styleID)? targetStyle : item );
                 results.update(currResults => {
                     return {...currResults, text:updatedStyles}
                 });
             break;
 
             case 'color':
-                targetStyle = colors.find( item => item.id == detail.styleID );
+                targetStyle = $results.colors.find( item => item.id == detail.styleID );
 
                 newCount = targetStyle.totalCount - detail.nodeIDs.length;
                 newPages = targetStyle.pages.filter(pageInfo => pageInfo.id != detail.pageID);
 
                 targetStyle.totalCount = newCount;
                 targetStyle.pages = newPages;
-                updatedStyles = colors.map( item => (item.id == detail.styleID)? targetStyle : item );
+                updatedStyles = $results.colors.map( item => (item.id == detail.styleID)? targetStyle : item );
                 results.update(currResults => {
                     return {...currResults, colors:updatedStyles}
                 });
             break;
 
             case 'comp':
-                targetStyle = comps.find( item => item.id == detail.styleID );
+                targetStyle = $results.comps.find( item => item.id == detail.styleID );
 
                 newCount = targetStyle.totalCount - detail.nodeIDs.length;
                 newPages = targetStyle.pages.filter(pageInfo => pageInfo.id != detail.pageID);
 
                 targetStyle.totalCount = newCount;
                 targetStyle.pages = newPages;
-                updatedStyles = comps.map( item => (item.id == detail.styleID)? targetStyle : item );
+                updatedStyles = $results.comps.map( item => (item.id == detail.styleID)? targetStyle : item );
                 results.update(currResults => {
                     return {...currResults, comps:updatedStyles}
                 });
@@ -305,15 +299,116 @@
         }
     }
 
+
+
+
+
+
+    //---------------SWAPS LAYERS
+    //swaps all layers from selected style
+    function swapAllLayers(detail){
+
+        //find the target and swapped styles
+        let targetStyle, swappedStyle;
+        switch(detail.type){
+            case 'text':
+                targetStyle = $results.text.find( item => item.id == detail.id );
+                swappedStyle = $results.text.find( item => item.id == detail.swapID );
+            break;
+
+            case 'color':
+                targetStyle = $results.colors.find( item => item.id == detail.id );
+                swappedStyle = $results.colors.find( item => item.id == detail.swapID );
+            break;
+
+            case 'comp':
+                targetStyle = $results.comps.find( item => item.id == detail.id );
+                swappedStyle = $results.comps.find( item => item.id == detail.swapID );
+            break;
+        }
+
+        //next, transfer page info and total count from target to swapped style
+        //if swapped style is scanned ie pages is not null, update its page info on UI side
+        if(swappedStyle.pages){
+            for(const targetPage of targetStyle.pages){
+                //find matching page in swapped style
+                const matchingPage = swappedStyle.pages.find(page => page.id == targetPage.id);
+                //if matching page is found, merge node ids of both pages into merged page
+                if(matchingPage){
+                    matchingPage.nodeIDs = matchingPage.nodeIDs.concat(targetPage.nodeIDs);
+                }
+                //if no matching page found, just push target page into merged pages
+                else{
+                    swappedStyle.pages.push(targetPage);
+                }
+                swappedStyle.totalCount += targetPage.nodeIDs.length;
+            }
+        }
+
+        //then, update the target style
+        targetStyle.pages = [];
+        targetStyle.totalCount = 0;
+
+        //if we checked yes for deleting the style, just delete the entire entry from its corresponding list
+        if(detail.deleteStyle){ deleteStyle(detail); }
+    }
+
+    //deletes layers/instances from selected style and page
+    function swapLayersFromPage(detail){
+
+        //find the target and swapped styles
+        let targetStyle, swappedStyle;
+        switch(detail.type){
+            case 'text':
+                targetStyle = $results.text.find( item => item.id == detail.styleID );
+                swappedStyle = $results.text.find( item => item.id == detail.swapID );
+            break;
+
+            case 'color':
+                targetStyle = $results.colors.find( item => item.id == detail.styleID );
+                swappedStyle = $results.colors.find( item => item.id == detail.swapID );
+            break;
+
+            case 'comp':
+                targetStyle = $results.comps.find( item => item.id == detail.styleID );
+                swappedStyle = $results.comps.find( item => item.id == detail.swapID );
+            break;
+        }
+
+        //next, transfer page info and total count from target to swapped style
+        const targetPage = targetStyle.pages.find(page => page.id == detail.pageID);
+        //if swapped style is scanned ie pages is not null, update its page info on UI side
+        if(swappedStyle.pages){
+                
+            const matchingPage = swappedStyle.pages.find(page => page.id == targetPage.id);
+            //if matching page is found, merge node ids of both pages into merged page
+            if(matchingPage){
+                matchingPage.nodeIDs = matchingPage.nodeIDs.concat(targetPage.nodeIDs);
+            }
+            //if no matching page found, just push target page into swapped style
+            else{
+                swappedStyle.pages.push(targetPage);
+            }
+            swappedStyle.totalCount += targetPage.nodeIDs.length;
+        }
+
+        //then, update the target style
+        targetStyle.pages = targetStyle.pages.filter(page => page.id != targetPage.id);
+        targetStyle.totalCount -= targetPage.nodeIDs.length;
+    }
+
 </script>
 
 
 
-<table bind:this={display}>
+
+
+<div class='table-cont {scrollClass}'>
+<table>
     <tbody>
-        {#if $displayMode == 'Text'}
-            {#if text.length > 0}
-                {#each text as textEntry}
+        {#if $displayMode == 'text'}
+            {#if $results.text.length > 0}
+                {#each $results.text as textEntry}
                     <StyleResult type='text' {...textEntry}/>
                 {/each}
             {:else}
@@ -321,9 +416,9 @@
             {/if}
         {/if}
         
-        {#if $displayMode == 'Colors'}
-            {#if colors.length > 0}
-                {#each colors as colorEntry}
+        {#if $displayMode == 'color'}
+            {#if $results.colors.length > 0}
+                {#each $results.colors as colorEntry}
                     <StyleResult type='color' {...colorEntry}/>
                 {/each}
             {:else}
@@ -331,9 +426,9 @@
             {/if}
         {/if}
         
-        {#if $displayMode == 'Components'}
-            {#if comps.length > 0}
-                {#each comps as compEntry}
+        {#if $displayMode == 'comp'}
+            {#if $results.comps.length > 0}
+                {#each $results.comps as compEntry}
                     <StyleResult type='comp' {...compEntry}/>
                 {/each}
             {:else}
@@ -341,17 +436,27 @@
             {/if}
         {/if}
 
-        {#if $displayMode == 'Custom'}
+        {#if $displayMode == 'custom'}
             <StyleResult type={$selectedSearch.type} {...searchResult}/>
         {/if}
     </tbody>
 </table>
+</div>
 
 
 
 
 
 <style>
+    .table-cont{
+        /* we need to offset by the height of the menu bar so that we can scroll results all the way to the bottom*/
+        height: calc(100% - 72px);
+        overflow: auto;
+    }
+
+    .no-scroll {
+        overflow: hidden; /* Disable scrolling */
+    }
 
     table {
         background-color: white;

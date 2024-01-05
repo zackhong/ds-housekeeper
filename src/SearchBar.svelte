@@ -5,17 +5,17 @@
     import { slide } from 'svelte/transition';
     import { cubicOut } from 'svelte/easing';
     import SearchResult from './SearchResult.svelte';
-    import { search } from './stores';
 
     let placeholder='Search...';
 
     export let width=180;
-    let height=24;
-    let maxChars=20;
+    let height=24, maxChars=20;
 
     let typingTimer;
     let typingChars=2;//min # of chars that user needs to type to trigger search
     let typingDelay=300;//delay in ms; used for calling autocomplete when user has stopped typing
+
+    export let isSearching=false, text='', results=[];
 
     let self;//ref to self; used to check if we clicked outside it
 
@@ -38,8 +38,8 @@
 
     // Hides searchbar results & cancels search if we click anywhere outside it
     function handleClickOutside(event) {
-        if ($search.isSearching && !self.contains(event.target)) {
-            search.set({isSearching:false, text:''});
+        if (isSearching && !self.contains(event.target)) {
+            reset();
         }
     }
 
@@ -53,6 +53,11 @@
         }
     }
 
+    export function reset(){
+        isSearching = false;
+        text = '';
+    }
+
 </script>
 
 
@@ -60,13 +65,13 @@
 
 <div class="main" bind:this={self}>
     <div class="header" style="width:{width}px; height:{height}px;" >
-        <input type="text" placeholder={placeholder} bind:value={$search.text} maxlength={maxChars} on:input={handleInput}/>
+        <input type="text" placeholder={placeholder} bind:value={text} maxlength={maxChars} on:input={handleInput}/>
         <span class="material-symbols-outlined icon">search</span>
     </div>
-    {#if $search.isSearching}
+    {#if isSearching}
         <div class="body" style="width:{width}px;" transition:slide={{duration:200, easing:cubicOut}}>
-            {#if $search.results.length > 0}
-                {#each $search.results as result}
+            {#if results.length > 0}
+                {#each results as result}
                     <SearchResult {...result} onSelect={onSelect}/>
                 {/each}
             {:else}
@@ -85,6 +90,7 @@
         display: flex;
         flex-direction: column;
         align-items: start;
+        position: relative;
     }
 
     .header{
@@ -123,8 +129,7 @@
 
     .body{
         position: absolute;
-        top: 34px;
-
+        top: 24px;
         display: flex;
         flex-direction: column;
         align-items: start;

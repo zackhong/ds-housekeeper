@@ -9,7 +9,7 @@ figma.showUI(__html__, {width: 400, height: 600});
 figma.ui.onmessage = message => {
 	switch(message.action){
 
-		//-----INITIAL LOADING SEQUENCE
+		//-----LOAD LOCAL STYLES (CALLED ON INITIAL LOAD)
 		case 'load-local-text':
 		textHandler.getLocal();
 		break;
@@ -25,6 +25,21 @@ figma.ui.onmessage = message => {
 		case 'load-local-comps-continue':
 		compHandler.processLocalChunk();
 		break;
+
+
+
+
+		//-------LOAD REMOTE STYLES
+		case 'load-remote-text-start':
+		textHandler.getRemote();
+		break;
+
+		case 'load-remote-text-continue':
+		textHandler.remoteChunk();
+		break;
+
+
+
 
 		//-------SCAN STYLE FOR USAGE
 		case 'scan-text-start': 
@@ -51,6 +66,11 @@ figma.ui.onmessage = message => {
 		compHandler.usageChunk();
 		break;
 
+
+
+
+
+
 		//---------VIEW AND SELECT
 		case 'view-local-comp':
 		compHandler.viewLocalComp(message);
@@ -63,6 +83,10 @@ figma.ui.onmessage = message => {
 		case 'select-continue':
 		selectHandler.processChunk();
 		break;
+
+
+
+
 
 		//-----------DELETE STYLES
 		case 'delete-text':
@@ -130,6 +154,57 @@ figma.ui.onmessage = message => {
 
 
 
-		//-------------SWAP ALL LAYERS OF SELECTED STYLE
+
+
+		//-------------SWAP ALL LAYERS FROM STYLE
+		case 'swap-all-text':
+		textHandler.swapAllLayers(message);
+		break;
+
+		case 'swap-all-text-continue':
+		textHandler.swapAllChunk();
+		break;
+
+		case 'swap-all-color':
+		colorHandler.swapAllLayers(message);
+		break;
+
+		case 'swap-all-color-continue':
+		colorHandler.swapAllChunk();
+		break;
+
+		case 'swap-all-comp':
+		compHandler.swapAllLayers(message);
+		break;
+
+		case 'swap-all-comp-continue':
+		compHandler.swapAllChunk();
+		break;
+
+
+		//-------------SWAP LAYERS FROM PAGE
+		case 'swap-text-from-page':
+		textHandler.swapFromPage(message);
+		break;
+
+		case 'swap-text-from-page-continue':
+		textHandler.swapFromPageChunk();
+		break;
+
+		case 'swap-color-from-page':
+		colorHandler.swapFromPage(message);
+		break;
+
+		case 'swap-color-from-page-continue':
+		colorHandler.swapFromPageChunk();
+		break;
+
+		case 'swap-comp-from-page':
+		compHandler.swapFromPage(message);
+		break;
+
+		case 'swap-comp-from-page-continue':
+		compHandler.swapFromPageChunk();
+		break;
 	}
 };

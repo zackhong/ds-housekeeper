@@ -1,6 +1,4 @@
 let textStyles = new Set(), textNodes = [];
-let textIndex, remoteTextToUI;
-
 let uniqueConsumers, myIterator;
 
 
@@ -48,49 +46,47 @@ export function getLocal(){
 
 
 
+
 //--------FUNCTIONS FOR GETTING REMOTE STYLES
 export function getRemote(){
 
-    // since there isn't a getRemoteTextStyles() method, we have to check every text node for text styles that aren't local
-    figma.ui.postMessage({action:"load-update", text:`Finding library text styles...`});
-   
-    //retrieve all text nodes in file
-    textNodes = figma.root.findAllWithCriteria({ types: ["TEXT"]});
-
-    //start by processing 1st chunk of text nodes
-    textIndex=0;
-    remoteTextToUI=[];
-    processRemoteChunk();
+  myIterator = remoteIterator();
+  swapFromPageChunk();
 }
 
-//checks a chunk of text nodes for new remote text styles
-export function processRemoteChunk(chunkSize=100){
+// since there isn't a getRemoteTextStyles() method, we have to check every text node for text styles that aren't local
+function* remoteIterator(chunkSize=100){
 
-  let chunk = textNodes.slice(textIndex, textIndex + chunkSize);
+  let counter = 0, textToUI=[];
+  //retrieve all text nodes in file
+  textNodes = figma.root.findAllWithCriteria({ types: ["TEXT"]});
 
-  for(const node of chunk){
-    
+  for(const node of textNodes){
+
+    //check if this node's style is already included in the current list of text styles;
+    //if not, then this style must be remote
     let styleID = String(node.textStyleId);
-
-    //check if node has a text style that isn't found yet
     if(styleID && !styleID.includes('Symbol') && !textStyles.has(styleID)){
       let style = figma.getStyleById(styleID) as TextStyle;
-      //then check if that style is valid, then process style info
-      if(style){ processStyle(style, remoteTextToUI, false); }
+      if(style){ processStyle(style, textToUI, false); }
+    }
+
+    counter++;
+    //updates loading screen after deleting each chunk of nodes
+    if(counter % chunkSize == 0){
+      yield {action:'load-remote-text-progress', text:`Checking ${counter} text layers...`};
     }
   }
-  textIndex = textIndex+chunkSize;
-
-  //if we still have more text nodes to process, tell the UI to update loading screen progress
-  //otherwise, send process remote text style info to UI
-  if(chunk.length < chunkSize){
-    figma.ui.postMessage({action:"display-text", data:remoteTextToUI});
-    figma.ui.postMessage({action:"remote-text-complete"});
-  }
-  else{
-    figma.ui.postMessage({action:"process-remote-text", text:`Checking ${textIndex}/${textNodes.length} text layers...`});
-  }
+  yield { action:'display-remote-text', data:textToUI };
 }
+
+export function remoteChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
 
 
 
@@ -253,6 +249,91 @@ function* deleteFromPageIterator(message, chunkSize=100){
 }
 
 export function deleteFromPageChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+
+
+
+//--------SWAPS ALL LAYERS FROM STYLE
+export function swapAllLayers(message){
+  myIterator = swapAllIterator(message);
+  swapAllChunk();
+}
+
+function* swapAllIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  for(const page of message.pages){
+    for(const nodeID of page.nodeIDs){
+
+      let node = figma.getNodeById(nodeID) as TextNode;
+      if(node != null){ 
+        node.textStyleId = message.swapID;
+      }
+
+      counter++;
+      //updates loading screen after deleting each chunk of nodes
+      if(counter % chunkSize == 0){
+        yield {action:'swap-all-text-progress', text:`Swapping ${counter} layers...`};
+      }
+    }
+  }
+  if(message.deleteStyle) { deleteStyle(message); }
+
+  //rescans swapped style if necessary
+  if(message.rescanSwapped){
+    yield {action:'scan-text-start', id:message.swapID, name:message.swapName};
+  }
+  else{
+    yield {action:'load-end'};
+  }
+}
+
+export function swapAllChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+//----------------SWAPS LAYERS FROM GIVEN PAGE
+export function swapFromPage(message){
+  
+  myIterator = swapFromPageIterator(message);
+  swapFromPageChunk();
+}
+
+function* swapFromPageIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  for(const nodeID of message.nodeIDs){
+
+    let node = figma.getNodeById(nodeID) as TextNode;
+    if(node != null){ 
+      node.textStyleId = message.swapID;
+    }
+
+    counter++;
+    //updates loading screen after deleting each chunk of nodes
+    if(counter % chunkSize == 0){
+      yield {action:'swap-text-from-page-progress', text:`Swapping ${counter} layers...`};
+    }
+  }
+
+  //rescans swapped style if necessary
+  if(message.rescanSwapped){
+    yield {action:'scan-text-start', id:message.swapID, name:message.swapName};
+  }
+  else{
+    yield {action:'load-end'};
+  }
+}
+
+export function swapFromPageChunk(){
   let nextChunk = myIterator.next();
   figma.ui.postMessage(nextChunk.value);
 }

@@ -6,14 +6,12 @@
     import PageInfo from './PageInfo.svelte';
     import Button from "./Button.svelte";
     import {getContext} from 'svelte';
+    import { results } from './stores.js';
     
-    export let totalCount;
-    export let pages;//using an associative array passed from plugin code
+    export let totalCount, pages;//using an associative array passed from plugin code
 
-    let styleInfo = getContext('styleInfo');
-    let countText;
-
-    let isExpanded = false;
+    let styleInfo = getContext('styleInfo'), countText, isExpanded = false, canSwap = false;
+    
     $: if(totalCount == undefined || totalCount == null){ 
         countText = `? ${(styleInfo.type == 'comp')? 'instances': 'layers'}`; 
     }
@@ -22,6 +20,21 @@
     }
     else{ 
         countText = `${totalCount} ${(styleInfo.type == 'comp')? 'instances': 'layers'}`; 
+    }
+
+    $: switch(styleInfo.type){
+
+        case 'text':
+        canSwap = $results.canSwapText;
+        break;
+
+        case 'color':
+        canSwap = $results.canSwapColors;
+        break;
+
+        case 'comp':
+        canSwap = $results.canSwapComps;
+        break;
     }
 
     //toggles breakdown of pages, if any
@@ -82,11 +95,13 @@
 
         {#if !(totalCount == undefined || totalCount == null) && totalCount > 0}
 
-            <Button label='Swap' 
-                type='secondary'
-                hasTooltip=true 
-                tooltipText='Swaps all layers to use another relevant style.'
-                onClick={swapAllLayers}/>
+            {#if canSwap}
+                <Button label='Swap' 
+                    type='secondary'
+                    hasTooltip=true 
+                    tooltipText='Swaps all layers to use another relevant style.'
+                    onClick={swapAllLayers}/>
+            {/if}
 
             <Button label='Delete' 
                 type='warning'

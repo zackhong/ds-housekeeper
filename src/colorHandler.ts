@@ -295,3 +295,92 @@ export function deleteFromPageChunk(){
   let nextChunk = myIterator.next();
   figma.ui.postMessage(nextChunk.value);
 }
+
+
+
+
+
+
+//--------SWAPS ALL LAYERS FROM STYLE
+export function swapAllLayers(message){
+  
+  myIterator = swapAllIterator(message);
+  swapAllChunk();
+}
+
+function* swapAllIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  for(const page of message.pages){
+    for(const nodeID of page.nodeIDs){
+
+      let node = figma.getNodeById(nodeID) as FrameNode;
+      if(node != null){ 
+        if(node.fillStyleId == message.id){ node.fillStyleId = message.swapID; }
+        if(node.strokeStyleId == message.id){ node.strokeStyleId = message.swapID; }
+      }
+
+      counter++;
+      //updates loading screen after deleting each chunk of nodes
+      if(counter % chunkSize == 0){
+        yield {action:'swap-all-color-progress', text:`Swapping ${counter} layers...`};
+      }
+    }
+  }
+  if(message.deleteStyle) { deleteStyle(message); }
+  //rescans swapped style if necessary
+  if(message.rescanSwapped){
+    yield {action:'scan-color-start', id:message.swapID, name:message.swapName};
+  }
+  else{
+    yield {action:'load-end'};
+  }
+}
+
+export function swapAllChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+
+
+
+//----------------SWAPS LAYERS FROM GIVEN PAGE
+export function swapFromPage(message){
+  
+  myIterator = swapFromPageIterator(message);
+  swapFromPageChunk();
+}
+
+function* swapFromPageIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  for(const nodeID of message.nodeIDs){
+
+    let node = figma.getNodeById(nodeID) as FrameNode;
+    if(node != null){ 
+      if(node.fillStyleId == message.styleID){ node.fillStyleId = message.swapID; }
+      if(node.strokeStyleId == message.styleID){ node.strokeStyleId = message.swapID; }
+    }
+
+    counter++;
+    //updates loading screen after deleting each chunk of nodes
+    if(counter % chunkSize == 0){
+      yield {action:'swap-color-from-page-progress', text:`Swapping ${counter} layers...`};
+    }
+  }
+  //rescans swapped style if necessary
+  if(message.rescanSwapped){
+    yield {action:'scan-color-start', id:message.swapID, name:message.swapName};
+  }
+  else{
+    yield {action:'load-end'};
+  }
+}
+
+export function swapFromPageChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}

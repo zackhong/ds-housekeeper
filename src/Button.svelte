@@ -2,16 +2,10 @@
 <script>
     import {tooltip} from './stores.js';
 
-    export let label;
-    export let type="primary";//"primary", "secondary", "warning"
-
-    export let hasIcon=false;
-    export let iconName;
-
-    export let hasTooltip = false;
-    export let tooltipText="";
-
-    export let onClick = () => {}; // Default to an empty function
+    export let label, size='medium', type="primary";//"primary", "secondary", "warning"
+    export let hasIcon=false, iconName;
+    export let hasTooltip = false, tooltipText="";
+    export let onClick = () => {}; // click handler for other components to attach to
 
     //position tooltip to appear close to the button when hovering over it
     function handleMouseEnter(event){
@@ -31,13 +25,13 @@
 
 
 
-<button class={type} 
+<button class="{type}"
     on:click={onClick} 
     on:mouseenter={ hasTooltip? handleMouseEnter : null} 
     on:mouseleave={ hasTooltip? handleMouseLeave : null}>
-    <p class="small">{label}</p>
+    <p class={(size == 'large')? 'medium': 'small'}>{label}</p>
     {#if hasIcon}
-        <span class="material-symbols-outlined">{iconName}</span>
+        <span class="material-symbols-outlined {(size == 'large')? 'large' : '' }">{iconName}</span>
     {/if}
 </button>
 
@@ -61,6 +55,10 @@
     span{ 
         color: white;
         font-size: 14px;
+    }
+
+    span.large{ 
+        font-size: 20px;
     }
 
     .primary{ background-color: var(--color-blue-4); }

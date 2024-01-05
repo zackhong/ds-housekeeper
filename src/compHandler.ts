@@ -275,3 +275,102 @@ export function deleteFromPageChunk(){
   let nextChunk = myIterator.next();
   figma.ui.postMessage(nextChunk.value);
 }
+
+
+
+
+
+//----------------------SWAPS ALL LAYERS FROM STYLE
+export function swapAllLayers(message){
+  myIterator = swapIterator(message);
+  swapAllChunk();
+}
+
+function* swapIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  let swapNode = figma.getNodeById(message.swapID);
+  //if swapped node is variant, we want instances to swap to its first child by default
+  if(swapNode.type == 'COMPONENT_SET'){
+    swapNode = (swapNode as ComponentSetNode).children[0] as ComponentNode;
+  }
+
+  for(const page of message.pages){
+    for(const nodeID of page.nodeIDs){
+
+      let node = figma.getNodeById(nodeID) as InstanceNode;
+      if(node != null){ 
+        //swaps instance to use another component
+        node.swapComponent(swapNode as ComponentNode);
+      }
+
+      counter++;
+      //updates loading screen after deleting each chunk of nodes
+      if(counter % chunkSize == 0){
+        yield {action:'swap-all-comp-progress', text:`Swapping ${counter} instances...`};
+      }
+    }
+  }
+  if(message.deleteStyle) { deleteStyle(message); }
+  //rescans swapped style if necessary
+  if(message.rescanSwapped){
+    yield {action:'scan-comp-start', id:message.swapID, name:message.swapName};
+  }
+  else{
+    yield {action:'load-end'};
+  }
+}
+
+export function swapAllChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+
+
+
+//----------------SWAPS LAYERS FROM GIVEN PAGE
+export function swapFromPage(message){
+  
+  myIterator = swapFromPageIterator(message);
+  swapFromPageChunk();
+}
+
+function* swapFromPageIterator(message, chunkSize=100){
+  
+  let counter = 0;
+  let swapNode = figma.getNodeById(message.swapID);
+  //if swapped node is variant, we want instances to swap to its first child by default
+  if(swapNode.type == 'COMPONENT_SET'){
+    swapNode = (swapNode as ComponentSetNode).children[0] as ComponentNode;
+  }
+
+  for(const nodeID of message.nodeIDs){
+
+    let node = figma.getNodeById(nodeID) as InstanceNode;
+    if(node != null){ 
+      //swaps instance to use another component
+      node.swapComponent(swapNode as ComponentNode);
+    }
+
+    counter++;
+    //updates loading screen after deleting each chunk of nodes
+    if(counter % chunkSize == 0){
+      yield {action:'swap-comp-from-page-progress', text:`Swapping ${counter} instances...`};
+    }
+  }
+  //rescans swapped style if necessary
+  if(message.rescanSwapped){
+    yield {action:'scan-comp-start', id:message.swapID, name:message.swapName};
+  }
+  else{
+    yield {action:'load-end'};
+  }
+}
+
+export function swapFromPageChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}

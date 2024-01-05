@@ -6,11 +6,11 @@
 
     export let width=100;
     let height=24;
-    export let options = ['lorem ipsum'];
+    export let options = [{id:'-1', value:'lorem ipsum'}];
+    //each element in options consists of its value and corresponding id
 
     let isExpanded = false;
-    let selected;
-    $: selected = options[0];
+    export let selected = {...options[0]};
 
     //ref to self; used for checking if we clicked outside it
     let dropdown;
@@ -38,13 +38,13 @@
     }
 
     function updateSelection(option){
-        selected = option;
+        selected = {...option};
         isExpanded = false;
         onClick(option);
     }
 
     export function setSelection(value){
-        selected = value;
+        selected.value = value;
     }
 
 </script>
@@ -54,14 +54,14 @@
 
 <div class="main" bind:this={dropdown}>
     <button class="header" style="width:{width}px; height:{height}px;" on:click={toggle}>
-        <p class='ellipsis'>{selected}</p>
+        <p class='ellipsis'>{selected.value}</p>
         <span class="material-symbols-outlined icon">{isExpanded? 'expand_less' : 'expand_more'}</span>
     </button>
     {#if isExpanded}
         <div class="body" style="width:{width}px;" transition:slide={{duration:200, easing:cubicOut}}>
             {#each options as option}
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions-->
-                <div class="option ellipsis" on:click={ ()=> {updateSelection(option)} }><p>{option}</p></div>
+                <div class="option ellipsis" on:click={ ()=> {updateSelection(option)} }><p>{option.value}</p></div>
             {/each}
         </div>
     {/if}

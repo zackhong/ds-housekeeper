@@ -55,12 +55,7 @@
                 onClick={deleteStyle}/>
             {/if}
         </div>
-        <Usage 
-        totalCount={totalCount} 
-        pages={pages} 
-        id={id} 
-        type={type} 
-        name={name}/>
+        <Usage  totalCount={totalCount}  pages={pages}/>
     </td>
 </tr>
 
