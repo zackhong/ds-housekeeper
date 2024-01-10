@@ -80,8 +80,10 @@
         let formattedType = (detail.type == 'comp')? 'instances' : 'layers';
         title = `delete all ${formattedType}`;
         bodyText = `You are about to delete all ${formattedType} from <b>${truncateString(detail.styleName)}</b>. Are you sure?`;
-        checkboxText = `Delete <b>${truncateString(detail.styleName)}</b> as well`;
-        hasCheckbox = true;
+
+        hasCheckbox = detail.isLocal;
+        if(hasCheckbox){ checkboxText = `Delete <b>${truncateString(detail.styleName)}</b> as well`; }
+        
         okText = 'Delete All';
         okAction = () => deleteAllLayers(detail);
         isVisible = true;
@@ -107,11 +109,12 @@
         let formattedType = (detail.type == 'comp')? 'instances' : 'layers';
         title = `swap all ${formattedType}`;
         
-        fromName = truncateString(detail.styleName, 10);
+        fromName = truncateString(detail.styleName, 12);
         initSwapOptions(detail);
 
-        checkboxText = `Delete <b>${truncateString(detail.styleName)}</b> as well`;
-        hasCheckbox = true;
+        hasCheckbox = detail.isLocal;
+        if(hasCheckbox){ checkboxText = `Delete <b>${truncateString(detail.styleName)}</b> as well`; }
+        
         okText = 'Swap All';
         okAction = () => swapAllLayers(detail);
         isVisible = true;
@@ -124,7 +127,7 @@
         let formattedType = (detail.type == 'comp')? 'instances' : 'layers';
         title = `Swap ${formattedType} from page`;
         
-        fromName = truncateString(detail.styleName, 10);
+        fromName = truncateString(detail.styleName, 12);
         initSwapOptions(detail);
 
         hasCheckbox = false;
@@ -271,7 +274,7 @@
 
 
     function close(){
-        if(swapOptions.length > threshold){ searchbar.reset(); }
+        if(searchbar && swapOptions.length > threshold){ searchbar.reset(); }
         showWarning  = isChecked = isVisible = false;
     }
 
@@ -330,7 +333,7 @@
     //shortens string for long names
     function truncateString(str, maxLength=20) {
         if (str.length > maxLength) {
-            return '...' + str.substring(0, maxLength - 3);
+            return '...' + str.substring(str.length - maxLength);
         } else {
             return str;
         }

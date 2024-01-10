@@ -1,15 +1,9 @@
-let colorStyles = new Set(), colorNodes = [];
-let colorIndex, remoteColorsToUI;
-
+let colorStyles = new Set();
 let uniqueConsumers, myIterator;
 
 
 
 //--------------HELPER FUNCTIONS
-//using Promise and setTimeout to temp. pause plugin code so UI has time to update
-function delay(timeInMs:number){ return new Promise( (resolve)=> setTimeout(resolve, timeInMs) ); }
-
-
 // Convert values from Figma's color object to an rgba string 
 // this converts an rgb component (ranging from 0 to 255) to its hex representation
 function componentToHex(c) {
@@ -18,11 +12,27 @@ function componentToHex(c) {
   return hex.length === 1 ? '0' + hex : hex;
 }
 
-function rgbToHex(r, g, b) {
-  const red = componentToHex(Math.round(r * 255));
-  const green = componentToHex(Math.round(g * 255));
-  const blue = componentToHex(Math.round(b * 255));
-  return `#${red}${green}${blue}`;
+//-------FOR RUNNING THROUGH ITERATOR FUNCTIONS
+export function runNextChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+
+
+
+
+export function getLocal(){
+
+  const localColorStyles = figma.getLocalPaintStyles();
+  let colorsToUI = [];
+
+  for (const style of localColorStyles) {
+    if(!colorStyles.has(style.id)){ processStyle(style, colorsToUI); }
+  }
+  figma.ui.postMessage({action:"display-local-colors", data: colorsToUI});
 }
 
 //extracts style info and adds it to its appropriate array
@@ -47,76 +57,62 @@ function processStyle(style, outArray, isLocal=true){
       outArray.push( {id:style.id, name:styleName, info:styleInfo, isLocal:isLocal});
 }
 
-
-
-
-
-
-export function getLocal(){
-
-  const localColorStyles = figma.getLocalPaintStyles();
-  let colorsToUI = [];
-
-  for (const style of localColorStyles) {
-    if(!colorStyles.has(style.id)){ processStyle(style, colorsToUI); }
-  }
-  figma.ui.postMessage({action:"display-colors", data: colorsToUI});
+function rgbToHex(r, g, b) {
+  const red = componentToHex(Math.round(r * 255));
+  const green = componentToHex(Math.round(g * 255));
+  const blue = componentToHex(Math.round(b * 255));
+  return `#${red}${green}${blue}`;
 }
 
 
 
 
 
+
+
+//--------FUNCTIONS FOR GETTING REMOTE STYLES
 export function getRemote(){
 
-  // since there isn't a getRemotePaintStyles() method, we have to check every node for color styles that aren't local
-  figma.ui.postMessage({action:"load-update", text:`Finding library color styles...`});
+    myIterator = remoteIterator();
+    runNextChunk();
+}
 
-  colorNodes = figma.root.findAllWithCriteria({ types: [
+function* remoteIterator(chunkSize=100){
+
+  let counter = 0, colorsToUI=[];
+  //retrieve all nodes that use color
+  let colorNodes = figma.root.findAllWithCriteria({ types: [
     "BOOLEAN_OPERATION", "COMPONENT", "COMPONENT_SET", "INSTANCE",
     "ELLIPSE", "STAR", "RECTANGLE", "LINE", "POLYGON", "VECTOR",
     "FRAME", "TEXT" ]});
 
-    //start by processing 1st chunk of color nodes
-    colorIndex=0;
-    remoteColorsToUI=[];
-    processRemoteChunk();
-}
+  for(const node of colorNodes){
 
-//checks a chunk of text nodes for new remote text styles
-export function processRemoteChunk(chunkSize=100){
-
-  let chunk = colorNodes.slice(colorIndex, colorIndex + chunkSize);
-
-  for(const node of chunk){
-    
     //check the fill and stroke of every node to see if it's already registered
     let fillID = String(node.fillStyleId);
     if(fillID && !fillID.includes('Symbol') && !colorStyles.has(fillID)){
 
       let style = figma.getStyleById(fillID) as PaintStyle;
-      if(style){ processStyle(style, remoteColorsToUI, false); }
+      if(style){ processStyle(style, colorsToUI, false); }
     }
 
     let strokeID = String(node.strokeStyleId);
     if(strokeID && !strokeID.includes('Symbol') && !colorStyles.has(strokeID)){
 
       let style = figma.getStyleById(strokeID) as PaintStyle;
-      if(style){ processStyle(style, remoteColorsToUI, false); }
+      if(style){ processStyle(style, colorsToUI, false); }
+    }
+
+    counter++;
+    //updates loading screen after deleting each chunk of nodes
+    if(counter % chunkSize == 0){
+      yield {action:'load-remote-colors-progress', text:`Checking ${counter} layers...`};
     }
   }
-  colorIndex = colorIndex+chunkSize;
-
-  //if we still have more color nodes to process, tell the UI to update loading screen progress
-  //otherwise, send process remote color style info to UI
-  if(chunk.length < chunkSize){
-    figma.ui.postMessage({action:"display-colors", data:remoteColorsToUI});
-    figma.ui.postMessage({action:"remote-color-complete"});
-  }
-  else{
-    figma.ui.postMessage({action:"process-remote-color", text:`Checking ${colorIndex}/${colorNodes.length} layers...`});
-  }
+  yield { action:'display-remote-colors', data:colorsToUI };
 }
+
+
 
 
 
@@ -138,7 +134,7 @@ export function getUsage(message){
   //otherwise, we start processing our consumers in chunks
   else{
     myIterator = usageIterator(message.id);
-    usageChunk();
+    runNextChunk();
   }
 }
 
@@ -187,15 +183,6 @@ function* usageIterator(targetStyleID, chunkSize=100){
   }
 }
 
-//called by getUsage() or code.ts; just runs the generator function and post the yielded results
-export function usageChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
-
-
-
-
 //searches recursively for page that node belongs to from the bottom up; more efficient but may not always work
 function findPageBottomUp(node:BaseNode){
   if(node.parent){
@@ -234,7 +221,7 @@ export function deleteStyle(message){
 export function deleteAllLayers(message){
   
   myIterator = deleteAllIterator(message);
-  deleteAllChunk();
+  runNextChunk();
 }
 
 function* deleteAllIterator(message, chunkSize=100){
@@ -257,10 +244,6 @@ function* deleteAllIterator(message, chunkSize=100){
   yield {action:'load-end'};
 }
 
-export function deleteAllChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
 
 
 
@@ -271,7 +254,7 @@ export function deleteAllChunk(){
 export function deleteFromPage(message){
   
   myIterator = deleteFromPageIterator(message);
-  deleteFromPageChunk();
+  runNextChunk();
 }
 
 function* deleteFromPageIterator(message, chunkSize=100){
@@ -291,10 +274,6 @@ function* deleteFromPageIterator(message, chunkSize=100){
   yield {action:'load-end'};
 }
 
-export function deleteFromPageChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
 
 
 
@@ -305,7 +284,7 @@ export function deleteFromPageChunk(){
 export function swapAllLayers(message){
   
   myIterator = swapAllIterator(message);
-  swapAllChunk();
+  runNextChunk();
 }
 
 function* swapAllIterator(message, chunkSize=100){
@@ -337,10 +316,6 @@ function* swapAllIterator(message, chunkSize=100){
   }
 }
 
-export function swapAllChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
 
 
 
@@ -351,7 +326,7 @@ export function swapAllChunk(){
 export function swapFromPage(message){
   
   myIterator = swapFromPageIterator(message);
-  swapFromPageChunk();
+  runNextChunk();
 }
 
 function* swapFromPageIterator(message, chunkSize=100){
@@ -380,7 +355,11 @@ function* swapFromPageIterator(message, chunkSize=100){
   }
 }
 
-export function swapFromPageChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
+
+
+
+
+//--------------RESET
+export function reset(){
+  colorStyles = new Set();
 }

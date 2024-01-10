@@ -18,7 +18,9 @@
 
     //info for this component's descendants to access w/o having to drill its props down
     //eg no more <Child id={id} name={name}.../> and <GreatGrandChild id={id} name={name}.../>
-    setContext('styleInfo', {id, name, type});
+    let contextValue;
+    $: contextValue = {id, name, type, isLocal};
+    $: setContext('styleInfo', contextValue);
 
     //attached to delete button next to local style if scanning reveals 0 layers using it
     function deleteStyle(){
@@ -46,7 +48,6 @@
     <td class="name">
         <div class="style-name">
             <p class="large bold">{name}</p>
-            <!-- <p class="small">{id}</p> -->
             {#if totalCount == 0 && isLocal}
                 <Button label='Delete' 
                 type='warning'

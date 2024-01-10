@@ -4,7 +4,6 @@
     import { onMount, onDestroy } from 'svelte';
     import { displayMode, selectedSearch, results } from './stores.js';
 
-    let searchResult;//to be set when user selects an autocomplete result from the searchbar
     let scrollClass = $results.canScroll ? '' : 'no-scroll';
 
 
@@ -19,24 +18,6 @@
         document.removeEventListener('customEvent', handleCustomEvent);
     });
 
-    //finds and displays selected style when user clicks on a result in the searchbar
-    $: if( $displayMode == 'custom' ){
-
-        switch($selectedSearch.type){
-
-        case 'text':
-        searchResult = $results.text.find( item => item.id == $selectedSearch.id );
-        break;
-
-        case 'color':
-        searchResult = $results.colors.find( item => item.id == $selectedSearch.id );
-        break;
-
-        case 'comp':
-        searchResult = $results.comps.find( item => item.id == $selectedSearch.id );
-        break;
-        }
-    }
 
 
 
@@ -142,10 +123,6 @@
                 return {...currResults, comps:updatedStyles}
             });
             break;
-        }
-        //update usage if it's currently showing selected search result
-        if(displayMode == 'custom' && searchResult.id == message.id){
-            searchResult = {...searchResult, totalCount: message.totalCount, pages: message.pages, pageCount: message.pageCount};
         }
     }
 
@@ -406,38 +383,34 @@
 <div class='table-cont {scrollClass}'>
 <table>
     <tbody>
-        {#if $displayMode == 'text'}
-            {#if $results.text.length > 0}
-                {#each $results.text as textEntry}
+        {#if $results.text.length > 0}
+            {#each $results.text as textEntry}
+                {#if $displayMode == 'text' || ($displayMode == 'custom' && textEntry.id == $selectedSearch.id)}
                     <StyleResult type='text' {...textEntry}/>
-                {/each}
-            {:else}
-                <div class="empty"><p class="small">We didn't find any text styles. Would you like to reload the plugin or search from your imported libraries?</p></div>
-            {/if}
-        {/if}
-        
-        {#if $displayMode == 'color'}
-            {#if $results.colors.length > 0}
-                {#each $results.colors as colorEntry}
-                    <StyleResult type='color' {...colorEntry}/>
-                {/each}
-            {:else}
-                <div class="empty"><p class="small">We didn't find any color styles. Would you like to reload the plugin or search from your imported libraries?</p></div>
-            {/if}
-        {/if}
-        
-        {#if $displayMode == 'comp'}
-            {#if $results.comps.length > 0}
-                {#each $results.comps as compEntry}
-                    <StyleResult type='comp' {...compEntry}/>
-                {/each}
-            {:else}
-                <div class="empty"><p class="small">We didn't find any components. Would you like to reload the plugin or search from your imported libraries?</p></div>
-            {/if}
+                {/if}
+            {/each}
+        {:else if $displayMode == 'text'}
+            <div class="empty"><p class="small">We didn't find any text styles. Would you like to reload the plugin or search from your imported libraries?</p></div>
         {/if}
 
-        {#if $displayMode == 'custom'}
-            <StyleResult type={$selectedSearch.type} {...searchResult}/>
+        {#if $results.colors.length > 0}
+            {#each $results.colors as colorEntry}
+                {#if $displayMode == 'color' || ($displayMode == 'custom' && colorEntry.id == $selectedSearch.id)}
+                <StyleResult type='color' {...colorEntry}/>
+                {/if}
+            {/each}
+        {:else if $displayMode == 'color'}
+            <div class="empty"><p class="small">We didn't find any color styles. Would you like to reload the plugin or search from your imported libraries?</p></div>
+        {/if}
+
+        {#if $results.comps.length > 0}
+            {#each $results.comps as compEntry}
+                {#if $displayMode == 'comp' || ($displayMode == 'custom' && compEntry.id == $selectedSearch.id)}
+                <StyleResult type='comp' {...compEntry}/>
+                {/if}
+            {/each}
+        {:else if $displayMode == 'comp'}
+            <div class="empty"><p class="small">We didn't find any components. Would you like to reload the plugin or search from your imported libraries?</p></div>
         {/if}
     </tbody>
 </table>

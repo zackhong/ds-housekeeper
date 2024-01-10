@@ -6,7 +6,7 @@
     import Tooltip from './Tooltip.svelte';
 	import Options from './Options.svelte';
     import MenuBar from './MenuBar.svelte';
-	import { results } from './stores.js';
+	import { results, showRemoteBtn } from './stores.js';
 
 	let loading;
 	let resultDisplay;
@@ -22,13 +22,13 @@
 	onMount(() => { 
 		document.addEventListener('customEvent', handleCustomEvent); 
 		//waits a while before telling plugin to initialize
-		loading.updateText('Loading local text styles...');
+		loading.show('Loading local text styles...');
 		setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-text'} },'*'); }, 100 );
 	});
 
     onDestroy(() => {document.removeEventListener('customEvent', handleCustomEvent);});
 
-	
+
 
 	
 	//coordinates actions btw UI and plugin via messages,
@@ -38,27 +38,49 @@
 		let nextAction;
 		switch(event.data.pluginMessage.action){
 
-			case 'display-text':
+			//---------------LOADING LOCAL STYLES
+			case 'load-local-text':
+			loading.updateText('Loading local text styles...');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-text'} },'*'); }, 100 );
+			break;
+
+			case 'display-local-text':
 			loading.updateText('Loading local color styles...');
+			resultDisplay.handleMessage({action: 'display-text', data: event.data.pluginMessage.data});
 			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-colors'} },'*'); }, 100 );
 			break;
 
-			case 'display-colors':
+			case 'display-local-colors':
 			loading.updateText('Loading local components...');
+			resultDisplay.handleMessage({action: 'display-colors', data: event.data.pluginMessage.data});
 			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-comps-start'} },'*'); }, 100 );
 			break;
 
-			//tells plugin to keep processing local components until it's all complete
 			case 'load-local-comps-progress':
 			loading.updateProgress(event.data.pluginMessage.text);
 			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-comps-continue'} },'*'); }, 100 );
 			break;
 
-			case 'display-comps': case 'update-text': case 'update-color': case 'update-comp':
-			loading.hide();
+			case 'display-local-comps': 
+			resultDisplay.handleMessage({action: 'display-comps', data: event.data.pluginMessage.data});
 			results.update(currResults => {
                 return {...currResults, canScroll:true};
             });
+			loading.hide();
+			break;
+
+
+
+
+
+
+
+			//--------------UPDATING AFTER GETTING USAGE STATS OF STYLE
+			case 'update-text': case 'update-color': case 'update-comp':
+			results.update(currResults => {
+                return {...currResults, canScroll:true};
+            });
+			loading.hide();
 			break;
 
 
@@ -67,7 +89,7 @@
 
 
 			//--------------LOADING REMOTE STYLES
-			case 'load-remote-text-progress': case 'load-remote-color-progress': case 'load-remote-comp-progress':
+			case 'load-remote-text-progress': case 'load-remote-colors-progress': case 'load-remote-comps-progress':
 			loading.updateProgress(event.data.pluginMessage.text);
 			nextAction = event.data.pluginMessage.action.replace('progress', 'continue');
 			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: nextAction} },'*'); }, 100 );
@@ -75,10 +97,23 @@
 
 			case 'display-remote-text':
 			resultDisplay.handleMessage({action: 'display-text', data: event.data.pluginMessage.data});
-			loading.hide();
-			// loading.updateText('Loading remote color styles...');
-			// setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-remote-colors-start'} },'*'); }, 100 );
+			loading.show('Loading remote color styles...');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-remote-colors-start'} },'*'); }, 100 );
 			break;
+
+			case 'display-remote-colors':
+			resultDisplay.handleMessage({action: 'display-colors', data: event.data.pluginMessage.data});
+			loading.show('Loading remote comps...');
+			setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-remote-comps-start'} },'*'); }, 100 );
+			break;
+
+			case 'display-remote-comps':
+			resultDisplay.handleMessage({action: 'display-comps', data: event.data.pluginMessage.data});
+			showRemoteBtn.set(false);
+			loading.hide();
+			break;
+
+
 
 
 
@@ -169,6 +204,7 @@
 
 
 
+
 			//---------LOAD REMOTE STYLES
 			case 'load-remote-text-start':
 			loading.show('Loading remote text styles...');
@@ -250,6 +286,21 @@
 
 			//then tell plugin to delete all layers of this style from this page
 			setTimeout( ()=>{parent.postMessage({ pluginMessage: { ...event.detail, action:`swap-${event.detail.type}-from-page` }},'*');}, 100 );
+			break;
+			
+
+
+
+
+
+			//-----------RESETTIN RESULTS
+			case 'reset-ui':
+				loading.show('Resetting UI...');
+				//first, clear results
+				results.update(currResults => {
+					return {...currResults, text:[], colors:[], comps:[]};
+				});
+				setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'reset-ui'} },'*'); }, 100 );
 			break;
 		}
 	}

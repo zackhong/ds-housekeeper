@@ -2,7 +2,7 @@
     import Dropdown from "./Dropdown.svelte";
     import Search from "./SearchBar.svelte";
     import Button from "./Button.svelte";
-    import { displayMode, selectedSearch, results } from './stores.js';
+    import { displayMode, selectedSearch, results, showRemoteBtn } from './stores.js';
     import { onMount, onDestroy } from 'svelte';
 
     let dropdown;
@@ -72,7 +72,6 @@
                 outResults.push({id:compEntry.id, type:'comp', name:compEntry.name});
             }
         }
-
         searchState.isSearching = true;
         searchState.results = outResults;
     }
@@ -114,6 +113,16 @@
 
 
     //-----------------RESET UI
+    function resetUI(){
+
+        showRemoteBtn.set(true);
+
+        const customEvent = new CustomEvent('customEvent', {
+            detail: { action: 'reset-ui'},
+            bubbles: true
+        });
+        document.dispatchEvent(customEvent);
+    }
 </script>
 
 
@@ -122,16 +131,21 @@
 <div class="main">
     <div class='row'>
         <Dropdown width=108 options={options} onClick={updateSelection} bind:this={dropdown}/>
-        <Search onInputChange={findMatch} onSelect={selectResult} bind:this={searchbar} bind:isSearching={searchState.isSearching} bind:text={searchState.text} bind:results={searchState.results}/>
+        <Search width=240 onInputChange={findMatch} onSelect={selectResult} bind:this={searchbar} bind:isSearching={searchState.isSearching} bind:text={searchState.text} bind:results={searchState.results}/>
     </div>
     <div class='row'>
-        <Button 
-            label='Search Remote'
-            size='large'
-            hasTooltip=true
-            tooltipText='Search file for imported styles.<br><br>Warning: slow for large files!'
-            onClick={loadRemoteStyles}
-        />
+        {#if $showRemoteBtn}
+            <Button 
+                label='Search Remote'
+                size='large'
+                hasTooltip=true
+                tooltipText='Search file for imported styles.<br><br>Warning: slow for large files!'
+                onClick={loadRemoteStyles}
+            />
+        {:else}
+            <div></div>
+        {/if}
+        
         <Button 
             label='Reset UI'
             hasIcon=true
@@ -139,7 +153,8 @@
             type='secondary'
             size='large'
             hasTooltip=true
-            tooltipText="Resets UI to only display local styles.<br><br>Use this if you\'ve modified your file outside this plugin."
+            tooltipText="Resets UI to only display local styles.<br><br>Use this if you've modified your file outside this plugin."
+            onClick={resetUI}
         />
     </div>
     

@@ -10,16 +10,17 @@
     
     export let totalCount, pages;//using an associative array passed from plugin code
 
-    let styleInfo = getContext('styleInfo'), countText, isExpanded = false, canSwap = false;
-    
+    let styleInfo = getContext('styleInfo'), countText, isExpanded = false, canSwap = false, unit;
+    $: unit = (styleInfo.type == 'comp')? 'instance': 'layer';
+
     $: if(totalCount == undefined || totalCount == null){ 
-        countText = `? ${(styleInfo.type == 'comp')? 'instances': 'layers'}`; 
+        countText = `? ${unit}s`; 
     }
     else if(totalCount == 1){ 
-        countText = `1 ${(styleInfo.type == 'comp')? 'instance': 'layer'}`; 
+        countText = `1 ${unit}`; 
     }
     else{ 
-        countText = `${totalCount} ${(styleInfo.type == 'comp')? 'instances': 'layers'}`; 
+        countText = `${totalCount} ${unit}s`; 
     }
 
     $: switch(styleInfo.type){
@@ -54,7 +55,7 @@
     //attached to swap button
     function swapAllLayers(){
         const customEvent = new CustomEvent('customEvent', {
-            detail: { action:'popup-swap-all-layers', type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, pages },
+            detail: { action:'popup-swap-all-layers', type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, pages, isLocal:styleInfo.isLocal },
             bubbles: true
         });
         document.dispatchEvent(customEvent);
@@ -63,7 +64,7 @@
     //attached to delete button next to all layers
     function deleteAllLayers(){
         const customEvent = new CustomEvent('customEvent', {
-            detail: { action:'popup-delete-all-layers', type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, pages },
+            detail: { action:'popup-delete-all-layers', type:styleInfo.type, styleID:styleInfo.id, styleName:styleInfo.name, pages, isLocal:styleInfo.isLocal },
             bubbles: true
         });
         document.dispatchEvent(customEvent);
@@ -90,7 +91,7 @@
         <!-- list of actions applying to this style-->
         <Button label={(totalCount == undefined || totalCount == null)? 'Scan' : 'Rescan'} 
                 hasTooltip=true 
-                tooltipText='Tracks every layer using this style.<br><br>Warning: might be slow for large file!' 
+                tooltipText='Tracks every {unit} using this style.<br><br>Warning: slow for large files!' 
                 onClick={scanStyle}/>
 
         {#if !(totalCount == undefined || totalCount == null) && totalCount > 0}
@@ -99,14 +100,14 @@
                 <Button label='Swap' 
                     type='secondary'
                     hasTooltip=true 
-                    tooltipText='Swaps all layers to use another relevant style.'
+                    tooltipText='Swaps all {unit}s to use another relevant style.'
                     onClick={swapAllLayers}/>
             {/if}
 
             <Button label='Delete' 
                 type='warning'
                 hasTooltip=true 
-                tooltipText='Deletes all layers using this style.'
+                tooltipText='Deletes all {unit}s using this style.'
                 onClick={deleteAllLayers}/>
         {/if}
     </div>

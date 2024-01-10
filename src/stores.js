@@ -27,3 +27,5 @@ export const results = writable({
     canSwapText:false, canSwapColors:false, canSwapComps:false,
     canScroll:true
 });
+
+export const showRemoteBtn = writable(true);

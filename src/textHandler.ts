@@ -1,10 +1,37 @@
-let textStyles = new Set(), textNodes = [];
+let textStyles = new Set();
 let uniqueConsumers, myIterator;
 
 
 
 
-//--------------HELPER FUNCTIONS
+//-------FOR RUNNING THROUGH ITERATOR FUNCTIONS
+export function runNextChunk(){
+  let nextChunk = myIterator.next();
+  figma.ui.postMessage(nextChunk.value);
+}
+
+
+
+
+
+//------------------FUNCTIONS FOR LOCAL STYLES
+export function getLocal(){
+
+  const localTextStyles = figma.getLocalTextStyles();
+  let textToUI = [];
+
+  for (const style of localTextStyles) {
+
+    const styleID = style.id;
+    //only process this style if it isn't a duplicate
+    if(!textStyles.has(style.id)){
+      processStyle(style, textToUI);
+    }
+  }
+  //finally, convert processed text style  to serializable form
+  figma.ui.postMessage({action:"display-local-text", data: textToUI});
+}
+
 function processStyle(style, outArray, isLocal=true){
   const styleName = style.name;
 
@@ -25,33 +52,13 @@ function processStyle(style, outArray, isLocal=true){
 
 
 
-//------------------FUNCTIONS FOR LOCAL STYLES
-export function getLocal(){
-
-  const localTextStyles = figma.getLocalTextStyles();
-  let textToUI = [];
-
-  for (const style of localTextStyles) {
-
-    const styleID = style.id;
-    //only process this style if it isn't a duplicate
-    if(!textStyles.has(style.id)){
-      processStyle(style, textToUI);
-    }
-  }
-  //finally, convert processed text style  to serializable form
-  figma.ui.postMessage({action:"display-text", data: textToUI});
-}
-
-
-
 
 
 //--------FUNCTIONS FOR GETTING REMOTE STYLES
 export function getRemote(){
 
   myIterator = remoteIterator();
-  swapFromPageChunk();
+  runNextChunk();
 }
 
 // since there isn't a getRemoteTextStyles() method, we have to check every text node for text styles that aren't local
@@ -59,7 +66,7 @@ function* remoteIterator(chunkSize=100){
 
   let counter = 0, textToUI=[];
   //retrieve all text nodes in file
-  textNodes = figma.root.findAllWithCriteria({ types: ["TEXT"]});
+  let textNodes = figma.root.findAllWithCriteria({ types: ["TEXT"]});
 
   for(const node of textNodes){
 
@@ -74,16 +81,13 @@ function* remoteIterator(chunkSize=100){
     counter++;
     //updates loading screen after deleting each chunk of nodes
     if(counter % chunkSize == 0){
-      yield {action:'load-remote-text-progress', text:`Checking ${counter} text layers...`};
+      yield {action:'load-remote-text-progress', text:`Checking ${counter} layers...`};
     }
   }
   yield { action:'display-remote-text', data:textToUI };
 }
 
-export function remoteChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
+
 
 
 
@@ -107,7 +111,7 @@ export function getUsage(message){
   //otherwise, we start processing our consumers in chunks
   else{
     myIterator = usageIterator(message.id);
-    usageChunk();
+    runNextChunk();
   }
 }
 
@@ -156,14 +160,6 @@ function* usageIterator(targetStyleID, chunkSize=100){
   }
 }
 
-//called by getUsage() or code.ts; just runs the generator function and post the yielded results
-export function usageChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
-
-
-
 //searches recursively for page that node belongs to from the bottom up; more efficient but may not always work
 function findPageBottomUp(node:BaseNode){
   if(node.parent){
@@ -177,6 +173,8 @@ function findPageBottomUp(node:BaseNode){
       return null;
   }
 }
+
+
 
 
 //--------DELETES STYLE FROM USER FILE
@@ -194,7 +192,7 @@ export function deleteStyle(message){
 export function deleteAllLayers(message){
   
   myIterator = deleteAllIterator(message);
-  deleteAllChunk();
+  runNextChunk();
 }
 
 function* deleteAllIterator(message, chunkSize=100){
@@ -217,10 +215,7 @@ function* deleteAllIterator(message, chunkSize=100){
   yield {action:'load-end'};
 }
 
-export function deleteAllChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
+
 
 
 
@@ -228,7 +223,7 @@ export function deleteAllChunk(){
 export function deleteFromPage(message){
   
   myIterator = deleteFromPageIterator(message);
-  deleteFromPageChunk();
+  runNextChunk();
 }
 
 function* deleteFromPageIterator(message, chunkSize=100){
@@ -248,10 +243,7 @@ function* deleteFromPageIterator(message, chunkSize=100){
   yield {action:'load-end'};
 }
 
-export function deleteFromPageChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
+
 
 
 
@@ -261,7 +253,7 @@ export function deleteFromPageChunk(){
 //--------SWAPS ALL LAYERS FROM STYLE
 export function swapAllLayers(message){
   myIterator = swapAllIterator(message);
-  swapAllChunk();
+  runNextChunk();
 }
 
 function* swapAllIterator(message, chunkSize=100){
@@ -293,10 +285,7 @@ function* swapAllIterator(message, chunkSize=100){
   }
 }
 
-export function swapAllChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
-}
+
 
 
 
@@ -304,7 +293,7 @@ export function swapAllChunk(){
 export function swapFromPage(message){
   
   myIterator = swapFromPageIterator(message);
-  swapFromPageChunk();
+  runNextChunk();
 }
 
 function* swapFromPageIterator(message, chunkSize=100){
@@ -333,7 +322,14 @@ function* swapFromPageIterator(message, chunkSize=100){
   }
 }
 
-export function swapFromPageChunk(){
-  let nextChunk = myIterator.next();
-  figma.ui.postMessage(nextChunk.value);
+
+
+
+
+
+
+
+//--------------RESET
+export function reset(){
+  textStyles = new Set();
 }
