@@ -24,9 +24,32 @@
 		//waits a while before telling plugin to initialize
 		loading.show('Loading local text styles...');
 		setTimeout( ()=>{ parent.postMessage({ pluginMessage: {action: 'load-local-text'} },'*'); }, 100 );
+		OAuthLogin();
 	});
 
     onDestroy(() => {document.removeEventListener('customEvent', handleCustomEvent);});
+
+
+
+
+
+	//opens a new window for OAuth; used to generate user access token from user
+	function OAuthLogin(){
+		const clientId = '9FAvfgVNtZrpQpy2rfNrfp';
+		const redirectUri = 'https://upwxbeimwmsloaktweto.supabase.co';
+		const scope = 'files:read';
+		const state = 'chicken-nut-bread'; // This should be a unique string to prevent CSRF attacks
+		const figmaAuthUrl = `https://www.figma.com/oauth?
+								client_id=${encodeURIComponent(clientId)}&
+								redirect_uri=${encodeURIComponent(redirectUri)}&
+								scope=${encodeURIComponent(scope)}&
+								state=${encodeURIComponent(state)}&
+								response_type=code`;
+
+		window.open(figmaAuthUrl);
+    
+	}
+
 
 
 
